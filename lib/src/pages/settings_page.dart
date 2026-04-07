@@ -34,6 +34,8 @@ class SettingsPage extends StatelessWidget {
                         SizedBox(height: 28),
                         SettingsIntro(),
                         SizedBox(height: 28),
+                        FirebaseSetupCard(),
+                        SizedBox(height: 28),
                         ConnectedDevicesSection(),
                         SizedBox(height: 28),
                         ConnectivityPreferencesSection(),

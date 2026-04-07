@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:rehab/src/firebase/firebase_bootstrap.dart';
+import 'package:rehab/src/firebase/rehab_firestore.dart';
 import 'package:rehab/src/models/app_tab.dart';
 import 'package:rehab/src/theme/app_colors.dart';
 import 'package:rehab/src/widgets/knee_widgets.dart';
@@ -109,6 +111,177 @@ class SettingsIntro extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+class FirebaseSetupCard extends StatefulWidget {
+  const FirebaseSetupCard({super.key});
+
+  @override
+  State<FirebaseSetupCard> createState() => _FirebaseSetupCardState();
+}
+
+class _FirebaseSetupCardState extends State<FirebaseSetupCard> {
+  final RehabFirestore _firestore = const RehabFirestore();
+  bool _isSaving = false;
+  String? _message;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = FirebaseBootstrap.status;
+    final isReady = FirebaseBootstrap.isReady;
+
+    final title = switch (status) {
+      FirebaseBootstrapStatus.initialized => 'Firebase connected',
+      FirebaseBootstrapStatus.notConfigured => 'Firebase not configured yet',
+      FirebaseBootstrapStatus.unsupportedPlatform =>
+        'Firebase disabled on this platform',
+    };
+
+    final subtitle = switch (status) {
+      FirebaseBootstrapStatus.initialized =>
+        'Firestore is ready. You can already write device config data into the database.',
+      FirebaseBootstrapStatus.notConfigured =>
+        'Code integration is done, but this project still needs FlutterFire configuration and platform config files.',
+      FirebaseBootstrapStatus.unsupportedPlatform =>
+        'Current platform is running without Firebase. Use Android, iOS, macOS, or Web after Firebase setup.',
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLowest,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: isReady
+                      ? AppColors.secondary.withValues(alpha: 0.12)
+                      : AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  isReady ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                  color: isReady ? AppColors.secondary : AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        height: 1.45,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 18),
+          const Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _FirebaseCollectionChip(label: 'patient_profiles'),
+              _FirebaseCollectionChip(label: 'rehab_sessions'),
+              _FirebaseCollectionChip(label: 'device_configs'),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              FilledButton.icon(
+                onPressed: isReady && !_isSaving ? _saveDemoConfig : null,
+                icon: _isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save_outlined),
+                label: Text(_isSaving ? 'Saving...' : 'Write Demo Data'),
+              ),
+              OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _message = FirebaseBootstrap.error?.toString();
+                  });
+                },
+                icon: const Icon(Icons.info_outline),
+                label: const Text('Show Firebase Status'),
+              ),
+            ],
+          ),
+          if (_message != null) ...[
+            const SizedBox(height: 14),
+            Text(
+              _message!,
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: AppColors.outline,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _saveDemoConfig() async {
+    setState(() {
+      _isSaving = true;
+      _message = null;
+    });
+
+    try {
+      await _firestore.saveDemoDeviceConfig();
+      setState(() {
+        _message = 'Demo config written to Firestore: device_configs/default';
+      });
+    } catch (error) {
+      setState(() {
+        _message = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSaving = false;
+        });
+      }
+    }
   }
 }
 
@@ -571,6 +744,31 @@ class DeviceMetricCard extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _FirebaseCollectionChip extends StatelessWidget {
+  const _FirebaseCollectionChip({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: AppColors.primary,
+        ),
       ),
     );
   }
