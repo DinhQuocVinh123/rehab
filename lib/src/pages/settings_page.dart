@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:rehab/src/firebase/firebase_bootstrap.dart';
 import 'package:rehab/src/firebase/rehab_firestore.dart';
 import 'package:rehab/src/models/app_tab.dart';
 import 'package:rehab/src/theme/app_colors.dart';
@@ -21,16 +20,6 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   static const _patientId = RehabFirestore.demoPatientId;
-
-  @override
-  void initState() {
-    super.initState();
-    if (FirebaseBootstrap.isReady) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        const RehabFirestore().ensurePatientSetup(_patientId);
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {

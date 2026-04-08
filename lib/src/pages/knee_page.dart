@@ -77,6 +77,7 @@ class KneePage extends StatelessWidget {
                               MaterialPageRoute<void>(
                                 builder: (_) => const ExercisesPage(
                                   initialJoint: ExerciseJoint.knee,
+                                  patientId: _patientId,
                                 ),
                               ),
                             );
@@ -150,26 +151,55 @@ class _KneeRecommendedExercisesSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<List<Map<String, dynamic>>>(
-      stream: const RehabFirestore().watchKneeExercises(patientId),
-      builder: (context, snapshot) {
-        final exercises = snapshot.data ?? const <Map<String, dynamic>>[];
-        return _SectionBlock(
-          title: 'Recommended Exercises',
-          subtitle: 'Current knee exercise documents stored for this patient.',
-          child: Column(
-            children: exercises
-                .map(
-                  (exercise) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: _ExerciseSummaryTile(
-                      title: exercise['title'] as String? ?? 'Untitled',
-                      subtitle:
-                          '${_pretty(exercise['phase'] as String? ?? 'guided')} • ${exercise['targetRangeLabel'] ?? '--'}',
-                    ),
-                  ),
-                )
-                .toList(),
-          ),
+      stream: const RehabFirestore().watchAssignedExercises(
+        patientId,
+        joint: 'knee',
+      ),
+      builder: (context, assignmentSnapshot) {
+        final assignments =
+            assignmentSnapshot.data ?? const <Map<String, dynamic>>[];
+
+        return StreamBuilder<List<Map<String, dynamic>>>(
+          stream: const RehabFirestore().watchKneeExercises(),
+          builder: (context, exerciseSnapshot) {
+            final exercisesById = {
+              for (final exercise
+                  in exerciseSnapshot.data ?? const <Map<String, dynamic>>[])
+                exercise['id'] as String: exercise,
+            };
+
+            return _SectionBlock(
+              title: 'Assigned Exercises',
+              subtitle:
+                  'Global knee exercise definitions assigned to this patient.',
+              child: Column(
+                children: assignments
+                    .map((assignment) {
+                      final exercise =
+                          exercisesById[assignment['exerciseId']] ??
+                          const <String, dynamic>{};
+                      final reps =
+                          assignment['targetReps'] ?? exercise['reps'] ?? '--';
+                      final sets =
+                          assignment['targetSets'] ?? exercise['sets'] ?? '--';
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _ExerciseSummaryTile(
+                          title: exercise['title'] as String? ??
+                              _pretty(
+                                assignment['exerciseId'] as String? ??
+                                    'untitled',
+                              ),
+                          subtitle:
+                              '${_pretty(assignment['status'] as String? ?? 'assigned')} • ${exercise['targetRangeLabel'] ?? '--'} • $reps x $sets',
+                        ),
+                      );
+                    })
+                    .toList(),
+              ),
+            );
+          },
         );
       },
     );

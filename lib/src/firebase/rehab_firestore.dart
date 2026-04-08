@@ -1,3 +1,5 @@
+import 'package:rehab/src/firebase/assigned_exercise_schema.dart';
+import 'package:rehab/src/firebase/assigned_exercise_seed.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:rehab/src/firebase/demo_patient_seed.dart';
 import 'package:rehab/src/firebase/elbow_firestore_schema.dart';
@@ -16,8 +18,11 @@ class RehabFirestore {
   CollectionReference<Map<String, dynamic>> get patients =>
       _db.collection('patients');
 
-  CollectionReference<Map<String, dynamic>> get _legacyKneeExercises =>
+  CollectionReference<Map<String, dynamic>> get kneeExercises =>
       _db.collection(KneeFirestoreSchema.kneeExercisesCollection);
+
+  CollectionReference<Map<String, dynamic>> get elbowExercises =>
+      _db.collection(ElbowFirestoreSchema.elbowExercisesCollection);
 
   DocumentReference<Map<String, dynamic>> patientDoc(String patientId) =>
       patients.doc(patientId);
@@ -31,8 +36,9 @@ class RehabFirestore {
   CollectionReference<Map<String, dynamic>> sessionsCollection(String patientId) =>
       patientDoc(patientId).collection('sessions');
 
-  CollectionReference<Map<String, dynamic>> kneeExercisesCollection(String patientId) =>
-      patientDoc(patientId).collection(KneeFirestoreSchema.kneeExercisesCollection);
+  CollectionReference<Map<String, dynamic>> assignedExercisesCollection(
+    String patientId,
+  ) => patientDoc(patientId).collection(AssignedExerciseSchema.assignedExercisesCollection);
 
   CollectionReference<Map<String, dynamic>> kneeSessionsCollection(String patientId) =>
       patientDoc(patientId).collection(KneeFirestoreSchema.kneeSessionsCollection);
@@ -41,9 +47,6 @@ class RehabFirestore {
       patientDoc(patientId)
           .collection(KneeFirestoreSchema.kneeProgressCollection)
           .doc(KneeFirestoreSchema.kneeProgressSummaryDoc);
-
-  CollectionReference<Map<String, dynamic>> elbowExercisesCollection(String patientId) =>
-      patientDoc(patientId).collection(ElbowFirestoreSchema.elbowExercisesCollection);
 
   CollectionReference<Map<String, dynamic>> elbowSessionsCollection(String patientId) =>
       patientDoc(patientId).collection(ElbowFirestoreSchema.elbowSessionsCollection);
@@ -77,8 +80,8 @@ class RehabFirestore {
         );
   }
 
-  Stream<List<Map<String, dynamic>>> watchKneeExercises(String patientId) {
-    return kneeExercisesCollection(patientId)
+  Stream<List<Map<String, dynamic>>> watchKneeExercises() {
+    return kneeExercises
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
@@ -88,8 +91,8 @@ class RehabFirestore {
         );
   }
 
-  Stream<List<Map<String, dynamic>>> watchElbowExercises(String patientId) {
-    return elbowExercisesCollection(patientId)
+  Stream<List<Map<String, dynamic>>> watchElbowExercises() {
+    return elbowExercises
         .snapshots()
         .map(
           (snapshot) => snapshot.docs
@@ -97,6 +100,24 @@ class RehabFirestore {
               .toList()
             ..sort(_sortByTitle),
         );
+  }
+
+  Stream<List<Map<String, dynamic>>> watchAssignedExercises(
+    String patientId, {
+    String? joint,
+  }) {
+    final stream = assignedExercisesCollection(patientId).snapshots();
+    return stream.map((snapshot) {
+      final assignments = snapshot.docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .where(
+            (assignment) =>
+                joint == null || assignment['joint'] == joint,
+          )
+          .toList()
+        ..sort(_sortAssignments);
+      return assignments;
+    });
   }
 
   Stream<Map<String, dynamic>?> watchKneeProgressSummary(String patientId) {
@@ -152,7 +173,7 @@ class RehabFirestore {
 
     for (final entry in KneeRehabSeed.exercises.entries) {
       batch.set(
-        kneeExercisesCollection(patientId).doc(entry.key),
+        kneeExercises.doc(entry.key),
         _withTimestamps(entry.value, includeCreatedAt: true),
         SetOptions(merge: true),
       );
@@ -172,7 +193,7 @@ class RehabFirestore {
 
     for (final entry in ElbowRehabSeed.exercises.entries) {
       batch.set(
-        elbowExercisesCollection(patientId).doc(entry.key),
+        elbowExercises.doc(entry.key),
         _withTimestamps(entry.value, includeCreatedAt: true),
         SetOptions(merge: true),
       );
@@ -190,8 +211,16 @@ class RehabFirestore {
       SetOptions(merge: true),
     );
 
+    for (final entry in AssignedExerciseSeed.assignments.entries) {
+      batch.set(
+        assignedExercisesCollection(patientId).doc(entry.key),
+        _withAssignmentTimestamps(entry.value, includeCreatedAt: true),
+        SetOptions(merge: true),
+      );
+    }
+
     await batch.commit();
-    await _cleanupLegacyTopLevelKneeExercises();
+    await _cleanupLegacyPatientExerciseCollections(patientId);
   }
 
   Future<void> updatePreferences(
@@ -294,6 +323,17 @@ class RehabFirestore {
     };
   }
 
+  Map<String, dynamic> _withAssignmentTimestamps(
+    Map<String, dynamic> source, {
+    bool includeCreatedAt = false,
+  }) {
+    return {
+      ...source,
+      if (includeCreatedAt) 'assignedAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+  }
+
   Future<void> refreshDeviceTelemetry(String patientId) async {
     _ensureReady();
 
@@ -317,8 +357,19 @@ class RehabFirestore {
     await ensurePatientSetup(demoPatientId);
   }
 
-  Future<void> _cleanupLegacyTopLevelKneeExercises() async {
-    final snapshot = await _legacyKneeExercises.get();
+  Future<void> _cleanupLegacyPatientExerciseCollections(String patientId) async {
+    await _deleteCollection(
+      patientDoc(patientId).collection(KneeFirestoreSchema.kneeExercisesCollection),
+    );
+    await _deleteCollection(
+      patientDoc(patientId).collection(ElbowFirestoreSchema.elbowExercisesCollection),
+    );
+  }
+
+  Future<void> _deleteCollection(
+    CollectionReference<Map<String, dynamic>> collection,
+  ) async {
+    final snapshot = await collection.get();
     if (snapshot.docs.isEmpty) {
       return;
     }
@@ -358,5 +409,26 @@ class RehabFirestore {
     final aTitle = (a['title'] as String? ?? '').toLowerCase();
     final bTitle = (b['title'] as String? ?? '').toLowerCase();
     return aTitle.compareTo(bTitle);
+  }
+
+  static int _sortAssignments(
+    Map<String, dynamic> a,
+    Map<String, dynamic> b,
+  ) {
+    final statusOrder = {
+      'active': 0,
+      'assigned': 1,
+      'paused': 2,
+      'completed': 3,
+    };
+    final aStatus = statusOrder[a['status']] ?? 99;
+    final bStatus = statusOrder[b['status']] ?? 99;
+    if (aStatus != bStatus) {
+      return aStatus.compareTo(bStatus);
+    }
+
+    final aId = (a['exerciseId'] as String? ?? '').toLowerCase();
+    final bId = (b['exerciseId'] as String? ?? '').toLowerCase();
+    return aId.compareTo(bId);
   }
 }

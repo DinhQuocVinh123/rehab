@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:rehab/src/firebase/firebase_bootstrap.dart';
+import 'package:rehab/src/firebase/rehab_firestore.dart';
 import 'package:rehab/src/models/app_tab.dart';
 import 'package:rehab/src/pages/elbow_page.dart';
 import 'package:rehab/src/pages/knee_page.dart';
@@ -12,7 +14,19 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const _patientId = RehabFirestore.demoPatientId;
+
   AppTab _currentTab = AppTab.knee;
+
+  @override
+  void initState() {
+    super.initState();
+    if (FirebaseBootstrap.isReady) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        const RehabFirestore().ensurePatientSetup(_patientId);
+      });
+    }
+  }
 
   void _selectTab(AppTab tab) {
     if (_currentTab == tab) {

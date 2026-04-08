@@ -1,0 +1,58 @@
+abstract final class AssignedExerciseSeed {
+  static const assignments = <String, Map<String, dynamic>>{
+    'heel_slide_flexion': {
+      'exerciseId': 'heel_slide_flexion',
+      'joint': 'knee',
+      'status': 'active',
+      'assignedBy': 'clinician_demo_001',
+      'targetReps': 12,
+      'targetSets': 3,
+      'notes': 'Primary flexion drill for early knee range restoration.',
+    },
+    'post_op_knee_extension': {
+      'exerciseId': 'post_op_knee_extension',
+      'joint': 'knee',
+      'status': 'active',
+      'assignedBy': 'clinician_demo_001',
+      'targetReps': 12,
+      'targetSets': 3,
+      'notes': 'Maintain extension quality after surgery.',
+    },
+    'terminal_knee_extension': {
+      'exerciseId': 'terminal_knee_extension',
+      'joint': 'knee',
+      'status': 'assigned',
+      'assignedBy': 'clinician_demo_001',
+      'targetReps': 15,
+      'targetSets': 3,
+      'notes': 'Progressive quadriceps control drill for mid rehab.',
+    },
+    'passive_elbow_flexion': {
+      'exerciseId': 'passive_elbow_flexion',
+      'joint': 'elbow',
+      'status': 'active',
+      'assignedBy': 'clinician_demo_001',
+      'targetReps': 10,
+      'targetSets': 2,
+      'notes': 'Gentle elbow flexion to reduce stiffness.',
+    },
+    'controlled_elbow_extension': {
+      'exerciseId': 'controlled_elbow_extension',
+      'joint': 'elbow',
+      'status': 'active',
+      'assignedBy': 'clinician_demo_001',
+      'targetReps': 10,
+      'targetSets': 3,
+      'notes': 'Primary extension control drill.',
+    },
+    'elbow_flexion_reach': {
+      'exerciseId': 'elbow_flexion_reach',
+      'joint': 'elbow',
+      'status': 'assigned',
+      'assignedBy': 'clinician_demo_001',
+      'targetReps': 12,
+      'targetSets': 2,
+      'notes': 'Progress to this once active range improves.',
+    },
+  };
+}
