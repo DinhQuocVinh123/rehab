@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:rehab/src/firebase/firebase_bootstrap.dart';
+import 'package:rehab/src/firebase/rehab_firestore.dart';
 import 'package:rehab/src/models/app_tab.dart';
 import 'package:rehab/src/theme/app_colors.dart';
 import 'package:rehab/src/widgets/settings_widgets.dart';
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   const SettingsPage({
     super.key,
     required this.currentTab,
@@ -12,6 +14,23 @@ class SettingsPage extends StatelessWidget {
 
   final AppTab currentTab;
   final ValueChanged<AppTab> onSelect;
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  static const _patientId = RehabFirestore.demoPatientId;
+
+  @override
+  void initState() {
+    super.initState();
+    if (FirebaseBootstrap.isReady) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        const RehabFirestore().ensurePatientSetup(_patientId);
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,20 +46,18 @@ class SettingsPage extends StatelessWidget {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 760),
-                    child: const Column(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SettingsProfileCard(),
+                      children: const [
+                        SettingsProfileCard(patientId: _patientId),
                         SizedBox(height: 28),
                         SettingsIntro(),
                         SizedBox(height: 28),
-                        FirebaseSetupCard(),
+                        ConnectedDevicesSection(patientId: _patientId),
                         SizedBox(height: 28),
-                        ConnectedDevicesSection(),
+                        ConnectivityPreferencesSection(patientId: _patientId),
                         SizedBox(height: 28),
-                        ConnectivityPreferencesSection(),
-                        SizedBox(height: 28),
-                        SettingsActionsSection(),
+                        SettingsActionsSection(patientId: _patientId),
                       ],
                     ),
                   ),
@@ -51,8 +68,8 @@ class SettingsPage extends StatelessWidget {
         ),
       ),
       bottomNavigationBar: SettingsBottomNav(
-        currentTab: currentTab,
-        onSelect: onSelect,
+        currentTab: widget.currentTab,
+        onSelect: widget.onSelect,
       ),
     );
   }

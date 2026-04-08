@@ -13,15 +13,22 @@ void main() {
     await tester.pump(const Duration(seconds: 4));
     await tester.pumpAndSettle();
 
-    expect(find.text('Knee Mobility'), findsOneWidget);
-    expect(find.text('Live Motion Flow'), findsOneWidget);
+    expect(find.text('Knee Overview'), findsOneWidget);
+    expect(
+      find.text('Firestore-backed knee rehab status for the current patient.'),
+      findsOneWidget,
+    );
+    expect(find.text('Guided Knee Exercises'), findsOneWidget);
 
     await tester.tap(find.text('ELBOW').last);
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('Elbow Joint'), findsOneWidget);
-    expect(find.text('Real-time Motion'), findsOneWidget);
-    expect(find.text('Daily Goal'), findsOneWidget);
+    expect(find.text('Elbow Overview'), findsOneWidget);
+    expect(
+      find.text('Firestore-backed elbow rehab status for the current patient.'),
+      findsOneWidget,
+    );
+    expect(find.text('Guided Elbow Exercises'), findsOneWidget);
 
     await tester.tap(find.text('CONFIG').last);
     await tester.pump(const Duration(milliseconds: 300));

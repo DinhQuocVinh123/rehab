@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:rehab/src/firebase/firebase_bootstrap.dart';
 import 'package:rehab/src/firebase/rehab_firestore.dart';
@@ -38,48 +39,39 @@ class SettingsTopBar extends StatelessWidget {
 }
 
 class SettingsProfileCard extends StatelessWidget {
-  const SettingsProfileCard({super.key});
+  const SettingsProfileCard({
+    super.key,
+    required this.patientId,
+  });
+
+  final String patientId;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLow,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _ProfileAvatar(),
-          SizedBox(width: 18),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Dr. Elena Vance',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.text,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Goal: Full ACL Mobility Restoration',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                SizedBox(height: 12),
-                _StatusChip(label: 'Active Patient'),
-              ],
-            ),
+    if (!FirebaseBootstrap.isReady) {
+      return const _SectionCard(
+        child: _ProfileCardBody(
+          fullName: 'Offline Preview',
+          goal: 'Connect Firebase to load patient profile',
+          status: 'Preview Mode',
+        ),
+      );
+    }
+
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: const RehabFirestore().watchPatientProfile(patientId),
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? const <String, dynamic>{};
+        return _SectionCard(
+          child: _ProfileCardBody(
+            fullName: data['fullName'] as String? ?? 'Loading patient...',
+            goal: data['goal'] as String? ?? 'Preparing treatment profile',
+            status: _capitalizeWords(data['status'] as String? ?? 'active'),
+            subtitle:
+                '${_capitalizeWords(data['injuryType'] as String? ?? 'Rehabilitation plan')} • ${_capitalizeWords(data['primaryJoint'] as String? ?? 'knee')}',
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -102,7 +94,7 @@ class SettingsIntro extends StatelessWidget {
         ),
         SizedBox(height: 8),
         Text(
-          'Manage your rehabilitation biomechanic sensors and connectivity preferences.',
+          'Manage patient identity, paired rehab sensors, and connectivity preferences backed by Firestore.',
           style: TextStyle(
             fontSize: 15,
             height: 1.45,
@@ -114,235 +106,122 @@ class SettingsIntro extends StatelessWidget {
   }
 }
 
-class FirebaseSetupCard extends StatefulWidget {
-  const FirebaseSetupCard({super.key});
+class ConnectedDevicesSection extends StatelessWidget {
+  const ConnectedDevicesSection({
+    super.key,
+    required this.patientId,
+  });
 
-  @override
-  State<FirebaseSetupCard> createState() => _FirebaseSetupCardState();
-}
-
-class _FirebaseSetupCardState extends State<FirebaseSetupCard> {
-  final RehabFirestore _firestore = const RehabFirestore();
-  bool _isSaving = false;
-  String? _message;
+  final String patientId;
 
   @override
   Widget build(BuildContext context) {
-    final status = FirebaseBootstrap.status;
-    final isReady = FirebaseBootstrap.isReady;
+    if (!FirebaseBootstrap.isReady) {
+      return const _OfflineSectionPlaceholder(
+        title: 'Connected Devices',
+        subtitle: 'Connect Firebase to read paired rehab sensors.',
+      );
+    }
 
-    final title = switch (status) {
-      FirebaseBootstrapStatus.initialized => 'Firebase connected',
-      FirebaseBootstrapStatus.notConfigured => 'Firebase not configured yet',
-      FirebaseBootstrapStatus.unsupportedPlatform =>
-        'Firebase disabled on this platform',
-    };
+    return StreamBuilder<List<Map<String, dynamic>>>(
+      stream: const RehabFirestore().watchDevices(patientId),
+      builder: (context, snapshot) {
+        final devices = snapshot.data ?? const <Map<String, dynamic>>[];
+        final activeDevice = devices.cast<Map<String, dynamic>?>().firstWhere(
+              (device) => device != null && device['isPrimary'] == true,
+              orElse: () => null,
+            );
+        final availableDevice = devices.cast<Map<String, dynamic>?>().firstWhere(
+              (device) => device != null && device['isPrimary'] != true,
+              orElse: () => null,
+            );
 
-    final subtitle = switch (status) {
-      FirebaseBootstrapStatus.initialized =>
-        'Firestore is ready. You can already write device config data into the database.',
-      FirebaseBootstrapStatus.notConfigured =>
-        'Code integration is done, but this project still needs FlutterFire configuration and platform config files.',
-      FirebaseBootstrapStatus.unsupportedPlatform =>
-        'Current platform is running without Firebase. Use Android, iOS, macOS, or Web after Firebase setup.',
-    };
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLowest,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: isReady
-                      ? AppColors.secondary.withValues(alpha: 0.12)
-                      : AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  isReady ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
-                  color: isReady ? AppColors.secondary : AppColors.primary,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        color: AppColors.text,
-                      ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Connected Devices',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.text,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        height: 1.45,
-                        color: AppColors.textMuted,
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          const Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              _FirebaseCollectionChip(label: 'patient_profiles'),
-              _FirebaseCollectionChip(label: 'rehab_sessions'),
-              _FirebaseCollectionChip(label: 'device_configs'),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              FilledButton.icon(
-                onPressed: isReady && !_isSaving ? _saveDemoConfig : null,
-                icon: _isSaving
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.save_outlined),
-                label: Text(_isSaving ? 'Saving...' : 'Write Demo Data'),
-              ),
-              OutlinedButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _message = FirebaseBootstrap.error?.toString();
-                  });
-                },
-                icon: const Icon(Icons.info_outline),
-                label: const Text('Show Firebase Status'),
-              ),
-            ],
-          ),
-          if (_message != null) ...[
-            const SizedBox(height: 14),
-            Text(
-              _message!,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.4,
-                color: AppColors.outline,
-              ),
+                TextButton.icon(
+                  onPressed: () => _runRefresh(context),
+                  icon: const Icon(Icons.sync, size: 18),
+                  label: const Text(
+                    'Refresh',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            ActiveDeviceCard(device: activeDevice),
+            const SizedBox(height: 16),
+            AvailableDeviceCard(
+              device: availableDevice,
+              onConnect: () => _pairAvailable(context),
             ),
           ],
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Future<void> _saveDemoConfig() async {
-    setState(() {
-      _isSaving = true;
-      _message = null;
-    });
+  Future<void> _runRefresh(BuildContext context) async {
+    await const RehabFirestore().refreshDeviceTelemetry(patientId);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Device telemetry refreshed')),
+      );
+    }
+  }
 
-    try {
-      await _firestore.saveDemoDeviceConfig();
-      setState(() {
-        _message = 'Demo config written to Firestore: device_configs/default';
-      });
-    } catch (error) {
-      setState(() {
-        _message = error.toString();
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isSaving = false;
-        });
-      }
+  Future<void> _pairAvailable(BuildContext context) async {
+    await const RehabFirestore().promoteAvailableDevice(patientId);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Available device promoted to active')),
+      );
     }
   }
 }
 
-class ConnectedDevicesSection extends StatelessWidget {
-  const ConnectedDevicesSection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Expanded(
-              child: Text(
-                'Connected Devices',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w900,
-                  color: AppColors.text,
-                ),
-              ),
-            ),
-            TextButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.sync, size: 18),
-              label: const Text(
-                'Refresh',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 18),
-        const ActiveDeviceCard(),
-        const SizedBox(height: 16),
-        const AvailableDeviceCard(),
-      ],
-    );
-  }
-}
-
 class ActiveDeviceCard extends StatelessWidget {
-  const ActiveDeviceCard({super.key});
+  const ActiveDeviceCard({
+    super.key,
+    required this.device,
+  });
+
+  final Map<String, dynamic>? device;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLowest,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0x26C3C6D7)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 10,
-            offset: Offset(0, 4),
+    if (device == null) {
+      return const _SectionCard(
+        child: Text(
+          'No active device paired yet.',
+          style: TextStyle(
+            fontSize: 15,
+            color: AppColors.textMuted,
           ),
-        ],
-      ),
+        ),
+      );
+    }
+
+    final battery = '${device!['batteryLevel'] ?? '--'}%';
+    final signal = device!['signalStrength'] as String? ?? 'Unknown';
+    final firmware = device!['firmwareVersion'] as String? ?? '--';
+    final serial = device!['serialNumber'] as String? ?? '--';
+
+    return _SectionCard(
+      borderColor: const Color(0x26C3C6D7),
       child: Column(
         children: [
           Row(
@@ -362,26 +241,26 @@ class ActiveDeviceCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 14),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Knee Kinematics v2',
-                      style: TextStyle(
+                      device!['name'] as String? ?? 'Unknown device',
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
                         color: AppColors.text,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Row(
                       children: [
-                        _StatusDot(color: AppColors.secondary),
-                        SizedBox(width: 8),
+                        const _StatusDot(color: AppColors.secondary),
+                        const SizedBox(width: 8),
                         Text(
-                          'ACTIVE & SYNCING',
-                          style: TextStyle(
+                          _deviceStatusLabel(device!['connectionStatus'] as String?),
+                          style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 1.8,
@@ -401,73 +280,81 @@ class ActiveDeviceCard extends StatelessWidget {
             builder: (context, constraints) {
               final isWide = constraints.maxWidth >= 640;
               if (isWide) {
-                return const Row(
+                return Row(
                   children: [
-                    Expanded(child: DeviceMetricCard(
-                      label: 'Battery',
-                      value: '75%',
-                      icon: Icons.battery_5_bar,
-                      accent: AppColors.secondary,
-                    )),
-                    SizedBox(width: 12),
-                    Expanded(child: DeviceMetricCard(
-                      label: 'Signal',
-                      value: 'Excellent',
-                      icon: Icons.signal_cellular_alt,
-                      accent: AppColors.secondary,
-                    )),
-                    SizedBox(width: 12),
-                    Expanded(child: DeviceMetricCard(
-                      label: 'Firmware',
-                      value: 'v2.4.1',
-                    )),
-                    SizedBox(width: 12),
-                    Expanded(child: DeviceMetricCard(
-                      label: 'Serial',
-                      value: 'RS-9920-KNE',
-                      dense: true,
-                    )),
+                    Expanded(
+                      child: DeviceMetricCard(
+                        label: 'Battery',
+                        value: battery,
+                        icon: Icons.battery_5_bar,
+                        accent: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DeviceMetricCard(
+                        label: 'Signal',
+                        value: signal,
+                        icon: Icons.signal_cellular_alt,
+                        accent: AppColors.secondary,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DeviceMetricCard(
+                        label: 'Firmware',
+                        value: firmware,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: DeviceMetricCard(
+                        label: 'Serial',
+                        value: serial,
+                        dense: true,
+                      ),
+                    ),
                   ],
                 );
               }
 
               return Column(
-                children: const [
+                children: [
                   Row(
                     children: [
                       Expanded(
                         child: DeviceMetricCard(
                           label: 'Battery',
-                          value: '75%',
+                          value: battery,
                           icon: Icons.battery_5_bar,
                           accent: AppColors.secondary,
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: DeviceMetricCard(
                           label: 'Signal',
-                          value: 'Excellent',
+                          value: signal,
                           icon: Icons.signal_cellular_alt,
                           accent: AppColors.secondary,
                         ),
                       ),
                     ],
                   ),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       Expanded(
                         child: DeviceMetricCard(
                           label: 'Firmware',
-                          value: 'v2.4.1',
+                          value: firmware,
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: DeviceMetricCard(
                           label: 'Serial',
-                          value: 'RS-9920-KNE',
+                          value: serial,
                           dense: true,
                         ),
                       ),
@@ -484,7 +371,14 @@ class ActiveDeviceCard extends StatelessWidget {
 }
 
 class AvailableDeviceCard extends StatelessWidget {
-  const AvailableDeviceCard({super.key});
+  const AvailableDeviceCard({
+    super.key,
+    required this.device,
+    required this.onConnect,
+  });
+
+  final Map<String, dynamic>? device;
+  final VoidCallback onConnect;
 
   @override
   Widget build(BuildContext context) {
@@ -507,22 +401,24 @@ class AvailableDeviceCard extends StatelessWidget {
             child: const Icon(Icons.fitness_center, color: AppColors.textMuted),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Elbow Sleeve 1.0',
-                  style: TextStyle(
+                  device?['name'] as String? ?? 'No additional device available',
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textMuted,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Last seen: 2 days ago',
-                  style: TextStyle(
+                  device == null
+                      ? 'Pair a new sensor to populate this slot'
+                      : 'Last seen: ${_formatDateTime(device?['lastSeenAt'])}',
+                  style: const TextStyle(
                     fontSize: 13,
                     color: Color(0x99434655),
                   ),
@@ -531,7 +427,7 @@ class AvailableDeviceCard extends StatelessWidget {
             ),
           ),
           FilledButton(
-            onPressed: () {},
+            onPressed: device == null ? null : onConnect,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.surfaceHighest,
               foregroundColor: AppColors.primary,
@@ -553,7 +449,12 @@ class AvailableDeviceCard extends StatelessWidget {
 }
 
 class ConnectivityPreferencesSection extends StatefulWidget {
-  const ConnectivityPreferencesSection({super.key});
+  const ConnectivityPreferencesSection({
+    super.key,
+    required this.patientId,
+  });
+
+  final String patientId;
 
   @override
   State<ConnectivityPreferencesSection> createState() =>
@@ -562,53 +463,96 @@ class ConnectivityPreferencesSection extends StatefulWidget {
 
 class _ConnectivityPreferencesSectionState
     extends State<ConnectivityPreferencesSection> {
-  bool _realTimeSyncing = true;
-  bool _autoConnect = true;
+  bool _isSavingRealtime = false;
+  bool _isSavingAutoConnect = false;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Connectivity Preferences',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: AppColors.text,
-          ),
-        ),
-        const SizedBox(height: 18),
-        PreferenceTile(
-          icon: Icons.bolt,
-          title: 'Real-time syncing',
-          subtitle: 'Stream joint data instantly during therapy',
-          value: _realTimeSyncing,
-          onChanged: (value) {
-            setState(() {
-              _realTimeSyncing = value;
-            });
-          },
-        ),
-        const SizedBox(height: 14),
-        PreferenceTile(
-          icon: Icons.autorenew,
-          title: 'Auto-connect',
-          subtitle: 'Pair automatically when in range',
-          value: _autoConnect,
-          onChanged: (value) {
-            setState(() {
-              _autoConnect = value;
-            });
-          },
-        ),
-      ],
+    if (!FirebaseBootstrap.isReady) {
+      return const _OfflineSectionPlaceholder(
+        title: 'Connectivity Preferences',
+        subtitle: 'Connect Firebase to edit patient preferences.',
+      );
+    }
+
+    return StreamBuilder<Map<String, dynamic>?>(
+      stream: const RehabFirestore().watchPreferences(widget.patientId),
+      builder: (context, snapshot) {
+        final data = snapshot.data ?? const <String, dynamic>{};
+        final realTimeSyncing = data['realTimeSyncing'] as bool? ?? true;
+        final autoConnect = data['autoConnect'] as bool? ?? true;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Connectivity Preferences',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.w900,
+                color: AppColors.text,
+              ),
+            ),
+            const SizedBox(height: 18),
+            PreferenceTile(
+              icon: Icons.bolt,
+              title: 'Real-time syncing',
+              subtitle: 'Stream joint data instantly during therapy',
+              value: realTimeSyncing,
+              isBusy: _isSavingRealtime,
+              onChanged: (value) => _updateRealtime(value),
+            ),
+            const SizedBox(height: 14),
+            PreferenceTile(
+              icon: Icons.autorenew,
+              title: 'Auto-connect',
+              subtitle: 'Pair automatically when in range',
+              value: autoConnect,
+              isBusy: _isSavingAutoConnect,
+              onChanged: (value) => _updateAutoConnect(value),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  Future<void> _updateRealtime(bool value) async {
+    setState(() => _isSavingRealtime = true);
+    try {
+      await const RehabFirestore().updatePreferences(
+        widget.patientId,
+        realTimeSyncing: value,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingRealtime = false);
+      }
+    }
+  }
+
+  Future<void> _updateAutoConnect(bool value) async {
+    setState(() => _isSavingAutoConnect = true);
+    try {
+      await const RehabFirestore().updatePreferences(
+        widget.patientId,
+        autoConnect: value,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isSavingAutoConnect = false);
+      }
+    }
   }
 }
 
 class SettingsActionsSection extends StatelessWidget {
-  const SettingsActionsSection({super.key});
+  const SettingsActionsSection({
+    super.key,
+    required this.patientId,
+  });
+
+  final String patientId;
 
   @override
   Widget build(BuildContext context) {
@@ -617,7 +561,18 @@ class SettingsActionsSection extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: () {},
+            onPressed: FirebaseBootstrap.isReady
+                ? () async {
+                    await const RehabFirestore().promoteAvailableDevice(patientId);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Paired next available device'),
+                        ),
+                      );
+                    }
+                  }
+                : null,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -640,7 +595,18 @@ class SettingsActionsSection extends StatelessWidget {
         SizedBox(
           width: double.infinity,
           child: TextButton(
-            onPressed: () {},
+            onPressed: FirebaseBootstrap.isReady
+                ? () async {
+                    await const RehabFirestore().refreshDeviceTelemetry(patientId);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Connection diagnostics completed'),
+                        ),
+                      );
+                    }
+                  }
+                : null,
             style: TextButton.styleFrom(
               foregroundColor: AppColors.textMuted,
               padding: const EdgeInsets.symmetric(vertical: 16),
@@ -749,31 +715,6 @@ class DeviceMetricCard extends StatelessWidget {
   }
 }
 
-class _FirebaseCollectionChip extends StatelessWidget {
-  const _FirebaseCollectionChip({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w700,
-          color: AppColors.primary,
-        ),
-      ),
-    );
-  }
-}
-
 class PreferenceTile extends StatelessWidget {
   const PreferenceTile({
     super.key,
@@ -782,6 +723,7 @@ class PreferenceTile extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    this.isBusy = false,
   });
 
   final IconData icon;
@@ -789,6 +731,7 @@ class PreferenceTile extends StatelessWidget {
   final String subtitle;
   final bool value;
   final ValueChanged<bool> onChanged;
+  final bool isBusy;
 
   @override
   Widget build(BuildContext context) {
@@ -833,11 +776,147 @@ class PreferenceTile extends StatelessWidget {
               ],
             ),
           ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: Colors.white,
-            activeTrackColor: AppColors.primary,
+          if (isBusy)
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Switch(
+              value: value,
+              onChanged: onChanged,
+              activeThumbColor: Colors.white,
+              activeTrackColor: AppColors.primary,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionCard extends StatelessWidget {
+  const _SectionCard({
+    required this.child,
+    this.borderColor,
+  });
+
+  final Widget child;
+  final Color? borderColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: borderColor == null ? null : Border.all(color: borderColor!),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _ProfileCardBody extends StatelessWidget {
+  const _ProfileCardBody({
+    required this.fullName,
+    required this.goal,
+    required this.status,
+    this.subtitle,
+  });
+
+  final String fullName;
+  final String goal;
+  final String status;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _ProfileAvatar(initials: _initialsFromName(fullName)),
+        const SizedBox(width: 18),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                fullName,
+                style: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.text,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Goal: $goal',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textMuted,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  subtitle!,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.outline,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              _StatusChip(label: status),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OfflineSectionPlaceholder extends StatelessWidget {
+  const _OfflineSectionPlaceholder({
+    required this.title,
+    required this.subtitle,
+  });
+
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SectionCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              color: AppColors.text,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subtitle,
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              color: AppColors.textMuted,
+            ),
           ),
         ],
       ),
@@ -846,7 +925,9 @@ class PreferenceTile extends StatelessWidget {
 }
 
 class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar();
+  const _ProfileAvatar({required this.initials});
+
+  final String initials;
 
   @override
   Widget build(BuildContext context) {
@@ -857,10 +938,14 @@ class _ProfileAvatar extends StatelessWidget {
         shape: BoxShape.circle,
         color: Color(0xFFDCE4FF),
       ),
-      child: const Icon(
-        Icons.person,
-        size: 40,
-        color: AppColors.primary,
+      alignment: Alignment.center,
+      child: Text(
+        initials,
+        style: const TextStyle(
+          fontSize: 28,
+          fontWeight: FontWeight.w900,
+          color: AppColors.primary,
+        ),
       ),
     );
   }
@@ -908,4 +993,55 @@ class _StatusDot extends StatelessWidget {
       ),
     );
   }
+}
+
+String _capitalizeWords(String value) {
+  return value
+      .split(RegExp(r'[_\s]+'))
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
+      .join(' ');
+}
+
+String _initialsFromName(String name) {
+  final parts = name
+      .split(' ')
+      .where((part) => part.trim().isNotEmpty)
+      .toList(growable: false);
+  if (parts.isEmpty) {
+    return 'RS';
+  }
+  if (parts.length == 1) {
+    return parts.first.substring(0, 1).toUpperCase();
+  }
+  return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
+}
+
+String _deviceStatusLabel(String? rawStatus) {
+  return _capitalizeWords(rawStatus ?? 'active');
+}
+
+String _formatDateTime(dynamic value) {
+  DateTime? dateTime;
+  if (value is Timestamp) {
+    dateTime = value.toDate();
+  } else if (value is DateTime) {
+    dateTime = value;
+  }
+
+  if (dateTime == null) {
+    return 'just now';
+  }
+
+  final difference = DateTime.now().difference(dateTime);
+  if (difference.inMinutes < 1) {
+    return 'just now';
+  }
+  if (difference.inHours < 1) {
+    return '${difference.inMinutes} min ago';
+  }
+  if (difference.inDays < 1) {
+    return '${difference.inHours} hr ago';
+  }
+  return '${difference.inDays} day${difference.inDays == 1 ? '' : 's'} ago';
 }
