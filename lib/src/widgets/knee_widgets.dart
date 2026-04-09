@@ -14,55 +14,13 @@ class KneeHeader extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.85),
         border: const Border(bottom: BorderSide(color: Color(0x14000000))),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Icon(Icons.menu, color: AppColors.textMuted),
-          ),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Text(
-              'Rehab Sanctuary',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.secondaryContainer,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.bluetooth_connected,
-                  size: 16,
-                  color: AppColors.secondary,
-                ),
-                SizedBox(width: 8),
-                Text(
-                  'KneeTracker-X1',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.onSecondaryFixed,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: const Text(
+        'Rehab Sanctuary',
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w900,
+          color: AppColors.primary,
+        ),
       ),
     );
   }

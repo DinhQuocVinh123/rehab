@@ -9,38 +9,19 @@ class ElbowTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.sizeOf(context).width >= 768;
-
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.85),
         border: const Border(bottom: BorderSide(color: Color(0x14000000))),
       ),
-      child: Row(
-        children: [
-          const Icon(Icons.menu, color: AppColors.primary),
-          const SizedBox(width: 14),
-          const Expanded(
-            child: Text(
-              'Rehab Sanctuary',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-          if (isWide) ...const [
-            TopTabLabel(label: 'Knee', active: false),
-            SizedBox(width: 18),
-            TopTabLabel(label: 'Elbow', active: true),
-            SizedBox(width: 18),
-            TopTabLabel(label: 'Config', active: false),
-            SizedBox(width: 18),
-          ],
-          const Icon(Icons.bluetooth_connected, color: AppColors.primary),
-        ],
+      child: const Text(
+        'Rehab Sanctuary',
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w900,
+          color: AppColors.primary,
+        ),
       ),
     );
   }

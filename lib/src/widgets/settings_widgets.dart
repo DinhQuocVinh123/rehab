@@ -17,22 +17,13 @@ class SettingsTopBar extends StatelessWidget {
         color: Colors.white.withValues(alpha: 0.85),
         border: const Border(bottom: BorderSide(color: Color(0x14000000))),
       ),
-      child: const Row(
-        children: [
-          Icon(Icons.menu, color: AppColors.primary),
-          SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              'Rehab Sanctuary',
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-          Icon(Icons.bluetooth_connected, color: AppColors.primary),
-        ],
+      child: const Text(
+        'Rehab Sanctuary',
+        style: TextStyle(
+          fontSize: 22,
+          fontWeight: FontWeight.w900,
+          color: AppColors.primary,
+        ),
       ),
     );
   }
