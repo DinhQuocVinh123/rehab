@@ -1,19 +1,25 @@
-const String elbowExerciseSvg = r'''
-<?xml version="1.0" encoding="iso-8859-1"?>
-<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
-<svg fill="#000000" height="800px" width="800px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
-	 viewBox="0 0 317.124 317.124" xml:space="preserve">
-  <path d="M309.008,195.1l-6.288,0.022c2.298-1.434,3.829-2.981,3.819-5.888c-0.015-4.467-3.649-7.076-8.116-7.061l-52.313,1.727
-	c-1.173,0.039-2.241-0.671-2.659-1.768c-0.418-1.097-0.093-2.337,0.808-3.089l9.368-7.814c3.497-2.781,4.077-7.869,1.295-11.365
-	c-2.78-3.496-7.869-4.076-11.365-1.295c0,0-22.083,17.638-29.492,23.456c-12.207,9.586-27.613,14.084-43.061,12.582
-	c-34.146-3.32-70.284-5.36-84.886-1.204L84.217,67.425c-0.055-3.674-3.049-6.623-6.724-6.623H6.725
-	c-2.025,0-3.941,0.912-5.219,2.483c-1.277,1.571-1.778,3.634-1.364,5.616L32.09,221.905c4.645,22.247,25.724,37.128,48.235,34.004
-	c35.289-4.897,75.304-13.261,108.772-20.277c10.381-2.176,20.913-2.503,31.416-1.025c31.895,4.488,54.572,3.715,59.033,3.7
-	c4.467-0.015,8.076-1.649,8.06-6.117c-0.01-2.907-1.558-4.444-3.866-5.861l13.422-0.046c4.467-0.016,8.076-3.65,8.061-8.117
-	c-0.01-2.908-1.558-5.444-3.866-6.862l7.707-0.027c4.467-0.016,8.076-3.65,8.06-8.117
-	C317.109,198.693,313.475,195.084,309.008,195.1z M12.735,83.977c0-4.142,3.358-7.5,7.5-7.5s7.5,3.358,7.5,7.5
-	c0,4.142-3.358,7.5-7.5,7.5S12.735,88.119,12.735,83.977z M34.93,159.844c-0.466,0.087-0.93,0.129-1.388,0.129
-	c-3.539,0-6.69-2.517-7.363-6.122l-9.188-49.121c-0.762-4.071,1.922-7.989,5.993-8.751c4.063-0.759,7.99,1.922,8.751,5.993
-	l9.188,49.121C41.685,155.165,39.001,159.083,34.93,159.844z"/>
+String elbowUpperArmSvg({required String fill, required String stroke}) => '''
+<svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <g id="upper_arm">
+    <path d="M 100,40 C 95,65 98,95 105,120 A 15 15 0 0 0 135,120 C 142,95 140,60 135,40 C 125,32 110,32 100,40 Z" fill="\$fill" stroke="\$stroke" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M 98,68 C 110,75 125,75 137,68" fill="none" stroke="\$stroke" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M 118,72 C 115,90 110,110 105,120" fill="none" stroke="\$stroke" stroke-width="2.5" stroke-linecap="round"/>
+    <circle cx="120" cy="120" r="15" fill="\$fill" stroke="\$stroke" stroke-width="4"/>
+    <circle cx="120" cy="120" r="4" fill="\$stroke"/>
+  </g>
+</svg>
+''';
+
+String elbowForearmSvg({required String fill, required String stroke}) => '''
+<svg viewBox="0 0 240 240" xmlns="http://www.w3.org/2000/svg">
+  <g id="forearm_hand">
+    <path d="M 120,105 C 140,98 170,105 190,115 C 200,113 208,115 210,124 C 210,128 198,128 195,126 C 170,136 140,138 120,135 A 15 15 0 0 1 120,105 Z" fill="\$fill" stroke="\$stroke" stroke-width="4" stroke-linejoin="round"/>
+    <path d="M 125,118 C 145,120 165,116 182,114" fill="none" stroke="\$stroke" stroke-width="2.5" stroke-linecap="round"/>
+    <path d="M 205,122 L 218,122 C 222,122 222,127 218,127 L 205,127 Z" fill="\$fill" stroke="\$stroke" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 202,118 L 220,118 C 224,118 224,123 220,123 L 202,123 Z" fill="\$fill" stroke="\$stroke" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 204,114 L 225,114 C 229,114 229,119 225,119 L 204,119 Z" fill="\$fill" stroke="\$stroke" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 200,110 L 220,110 C 224,110 224,115 220,115 L 200,115 Z" fill="\$fill" stroke="\$stroke" stroke-width="3" stroke-linejoin="round"/>
+    <path d="M 185,112 C 190,104 200,104 205,108 C 208,111 205,115 198,116 C 192,117 187,115 185,112 Z" fill="\$fill" stroke="\$stroke" stroke-width="3" stroke-linejoin="round"/>
+  </g>
 </svg>
 ''';

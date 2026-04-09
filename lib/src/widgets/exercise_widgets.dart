@@ -753,14 +753,14 @@ class _AnimatedKneeSvg extends StatelessWidget {
           ),
         ),
         Positioned.fill(
-          child: ClipPath(
-            clipper: const _RectClipper(upperLegRect),
-            child: Transform(
-              alignment: Alignment.topLeft,
-              transform: Matrix4.identity()
-                ..translateByDouble(hipPivot.dx, hipPivot.dy, 0, 1)
-                ..rotateZ(upperRotation)
-                ..translateByDouble(-hipPivot.dx, -hipPivot.dy, 0, 1),
+          child: Transform(
+            alignment: Alignment.topLeft,
+            transform: Matrix4.identity()
+              ..translateByDouble(hipPivot.dx, hipPivot.dy, 0, 1)
+              ..rotateZ(upperRotation)
+              ..translateByDouble(-hipPivot.dx, -hipPivot.dy, 0, 1),
+            child: ClipPath(
+              clipper: const _RectClipper(upperLegRect),
               child: svgLayer(),
             ),
           ),
@@ -1234,121 +1234,34 @@ class _AnimatedElbowSvg extends StatelessWidget {
   Widget build(BuildContext context) {
     const strokeColor = Color(0xFFF1F3F8);
 
-    Widget svgLayer() {
+    Widget svgLayer(String Function({required String fill, required String stroke}) builder) {
       return SvgPicture.string(
-        elbowExerciseSvg,
+        builder(fill: '#0F172A', stroke: '#F1F3F8'), // Slate 900 fill, light stroke
         fit: BoxFit.contain,
-        colorFilter: const ColorFilter.mode(
-          strokeColor,
-          BlendMode.srcIn,
-        ),
       );
     }
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final height = constraints.maxHeight;
-        final pivot = Offset(width * 0.26, height * 0.56);
-        final rotation = lerpDouble(-0.38, 0.14, progress)!;
-        final staticUpperArmRect = Rect.fromLTWH(
-          0,
-          0,
-          width * 0.42,
-          height,
-        );
-        final movingForearmRect = Rect.fromLTWH(
-          width * 0.24,
-          height * 0.18,
-          width * 0.80,
-          height * 0.60,
-        );
+        // Map progress to rotation angle. 
+        // We use -1.8 rad for flexed and 0.2 rad for extended.
+        final rotation = lerpDouble(-1.8, 0.2, progress)!;
 
         return Stack(
           children: [
             Positioned.fill(
-              child: Align(
-                alignment: Alignment.center,
-                child: OverflowBox(
-                  maxWidth: width * 1.18,
-                  maxHeight: height * 1.18,
-                  child: ClipPath(
-                    clipper: _RectClipper(staticUpperArmRect),
-                    child: svgLayer(),
-                  ),
-                ),
-              ),
+              child: svgLayer(elbowUpperArmSvg),
             ),
             Positioned.fill(
-              child: Align(
-                alignment: Alignment.center,
-                child: OverflowBox(
-                  maxWidth: width * 1.18,
-                  maxHeight: height * 1.18,
-                  child: ClipPath(
-                    clipper: _RectClipper(movingForearmRect),
-                    child: Transform(
-                      alignment: Alignment.topLeft,
-                      transform: Matrix4.identity()
-                        ..translateByDouble(pivot.dx, pivot.dy, 0, 1)
-                        ..rotateZ(rotation)
-                        ..translateByDouble(-pivot.dx, -pivot.dy, 0, 1),
-                      child: svgLayer(),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: pivot.dx - 2,
-              top: pivot.dy - 9,
               child: Transform.rotate(
                 angle: rotation,
-                alignment: Alignment.centerLeft,
-                child: Container(
-                  width: 34,
-                  height: 18,
-                  decoration: BoxDecoration(
-                    color: strokeColor,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              left: pivot.dx - 12,
-              top: pivot.dy - 12,
-              child: Container(
-                width: 24,
-                height: 24,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF1F3F8),
-                  shape: BoxShape.circle,
-                ),
+                alignment: Alignment.center,
+                child: svgLayer(elbowForearmSvg),
               ),
             ),
             Positioned.fill(
               child: CustomPaint(
                 painter: _ElbowArcPainter(),
-              ),
-            ),
-            Positioned(
-              left: pivot.dx - 10,
-              top: pivot.dy - 10,
-              child: Container(
-                width: 20,
-                height: 20,
-                decoration: BoxDecoration(
-                  color: strokeColor,
-                  shape: BoxShape.circle,
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
               ),
             ),
           ],
@@ -1501,75 +1414,32 @@ class _LightAnimatedElbowSvg extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget svgLayer() {
+    Widget svgLayer(String Function({required String fill, required String stroke}) builder) {
       return SvgPicture.string(
-        elbowExerciseSvg,
+        builder(fill: '#F8FAFC', stroke: '#5D636F'), // Slate 50 fill, dark stroke
         fit: BoxFit.contain,
-        colorFilter: const ColorFilter.mode(
-          Color(0xFF5D636F),
-          BlendMode.srcIn,
-        ),
       );
     }
 
-    final pivot = const Offset(76, 126);
-    final rotation = lerpDouble(-0.34, 0.16, progress)!;
-    const staticUpperArmRect = Rect.fromLTWH(0, 0, 112, 240);
-    const movingForearmRect = Rect.fromLTWH(78, 44, 198, 138);
+    final rotation = lerpDouble(-1.8, 0.2, progress)!;
 
     return Stack(
       clipBehavior: Clip.none,
       children: [
         Positioned.fill(
-          child: ClipPath(
-            clipper: const _RectClipper(staticUpperArmRect),
-            child: svgLayer(),
-          ),
+          child: svgLayer(elbowUpperArmSvg),
         ),
         Positioned.fill(
-          child: ClipPath(
-            clipper: const _RectClipper(movingForearmRect),
-            child: Transform(
-              alignment: Alignment.topLeft,
-              transform: Matrix4.identity()
-                ..translateByDouble(pivot.dx, pivot.dy, 0, 1)
-                ..rotateZ(rotation)
-                ..translateByDouble(-pivot.dx, -pivot.dy, 0, 1),
-              child: svgLayer(),
-            ),
-          ),
-        ),
-        Positioned(
-          left: pivot.dx - 2,
-          top: pivot.dy - 9,
           child: Transform.rotate(
             angle: rotation,
-            alignment: Alignment.centerLeft,
-            child: Container(
-              width: 34,
-              height: 18,
-              decoration: const BoxDecoration(
-                color: Color(0xFF5D636F),
-                borderRadius: BorderRadius.all(Radius.circular(999)),
-              ),
-            ),
+            alignment: Alignment.center,
+            child: svgLayer(elbowForearmSvg),
           ),
         ),
         Positioned(
-          left: pivot.dx - 12,
-          top: pivot.dy - 12,
-          child: Container(
-            width: 24,
-            height: 24,
-            decoration: const BoxDecoration(
-              color: Color(0xFF5D636F),
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-        Positioned(
-          left: pivot.dx - 9,
-          top: pivot.dy - 9,
+          // Place center dot indicator
+          left: 111,
+          top: 111,
           child: Container(
             width: 18,
             height: 18,
@@ -1600,7 +1470,7 @@ class _LightElbowArcPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * 0.44, size.height * 0.5);
+    final center = Offset(size.width / 2, size.height / 2);
     final arcPaint = Paint()
       ..color = accent.withValues(alpha: 0.45)
       ..style = PaintingStyle.stroke
@@ -1621,12 +1491,12 @@ class _LightElbowArcPainter extends CustomPainter {
     canvas.drawCircle(center, 3, Paint()..color = accent);
     canvas.drawLine(
       center,
-      Offset(size.width * 0.76, size.height * 0.5),
+      Offset(size.width * 0.8, center.dy),
       guide,
     );
     canvas.drawLine(
       center,
-      Offset(size.width * 0.7, size.height * 0.35),
+      Offset(size.width * 0.7, size.height * 0.2),
       guide,
     );
   }
@@ -1654,7 +1524,7 @@ class _RectClipper extends CustomClipper<Path> {
 class _ElbowArcPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * 0.27, size.height * 0.57);
+    final center = Offset(size.width / 2, size.height / 2);
     final guide = Paint()
       ..color = const Color(0x66FFFFFF)
       ..style = PaintingStyle.stroke
