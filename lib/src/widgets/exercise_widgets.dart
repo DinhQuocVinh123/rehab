@@ -6,6 +6,8 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:rehab/src/data/elbow_exercise_svg.dart';
 import 'package:rehab/src/models/exercise.dart';
 import 'package:rehab/src/theme/app_colors.dart';
+import 'package:rehab/src/widgets/character_3d_viewer.dart';
+import 'package:rehab/src/widgets/elbow_3d_widget.dart';
 
 const _kneeThighSvg = '''
 <?xml version="1.0" encoding="utf-8"?>
@@ -417,9 +419,20 @@ class _KneeExerciseShowcase extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          _KneeHeroVisual(
-            exercise: exercise,
-            accent: accent,
+          SizedBox(
+            height: 340,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Character3DViewer(
+                movementType: exercise.movementType,
+                startAngleDeg: exercise.startAngle,
+                endAngleDeg: exercise.endAngle,
+                cameraPositionY: 0.75,
+                cameraPositionZ: 2.2,
+                cameraTargetY: 0.55,
+                fov: 42,
+              ),
+            ),
           ),
           const SizedBox(height: 22),
           Row(
@@ -541,9 +554,17 @@ class _ElbowExerciseShowcase extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          _ElbowHeroVisual(
-            exercise: exercise,
-            accent: accent,
+          SizedBox(
+            height: 340,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: Character3DViewer(
+                movementType: exercise.movementType,
+                startAngleDeg: exercise.startAngle,
+                endAngleDeg: exercise.endAngle,
+                debugBones: true,
+              ),
+            ),
           ),
           const SizedBox(height: 22),
           Row(
@@ -1042,9 +1063,10 @@ class _ElbowHeroVisual extends StatelessWidget {
             Positioned.fill(
               child: Padding(
                 padding: const EdgeInsets.all(28),
-                child: _LightElbowVisual(
-                  exercise: exercise,
-                  accent: accent,
+                child: ElbowArm3DDemo(
+                  startAngleDeg: exercise.startAngle,
+                  endAngleDeg: exercise.endAngle,
+                  accentColor: accent,
                 ),
               ),
             ),

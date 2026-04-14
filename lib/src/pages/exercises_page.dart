@@ -245,13 +245,14 @@ ExerciseDefinition _exerciseFromFirestore(
           .whereType<String>()
           .toList();
 
+  final rawMovementType = definition['movementType'] as String? ?? joint.name;
+
   return ExerciseDefinition(
     id: definition['id'] as String? ?? '',
     joint: joint,
     title: definition['title'] as String? ?? 'Untitled',
-    movementLabel: _prettyLabel(
-      definition['movementType'] as String? ?? joint.name,
-    ),
+    movementType: rawMovementType,
+    movementLabel: _prettyLabel(rawMovementType),
     description: definition['description'] as String? ?? '',
     targetRange: definition['targetRangeLabel'] as String? ?? '--',
     reps:

@@ -6,6 +6,7 @@ abstract final class ExerciseLibrary {
       id: 'knee-flexion-slide',
       joint: ExerciseJoint.knee,
       title: 'Heel Slide Flexion',
+      movementType: 'knee_flexion',
       movementLabel: 'Knee Flexion',
       description:
           'Slide the heel toward the body to improve active knee flexion without forcing the joint.',
@@ -24,6 +25,7 @@ abstract final class ExerciseLibrary {
       id: 'knee-terminal-extension',
       joint: ExerciseJoint.knee,
       title: 'Terminal Knee Extension',
+      movementType: 'knee_extension',
       movementLabel: 'Knee Extension',
       description:
           'Straighten the knee through the last few degrees of extension to restore control and symmetry.',
@@ -42,6 +44,7 @@ abstract final class ExerciseLibrary {
       id: 'elbow-extension-control',
       joint: ExerciseJoint.elbow,
       title: 'Controlled Elbow Extension',
+      movementType: 'elbow_extension',
       movementLabel: 'Elbow Extension',
       description:
           'Extend the elbow gradually while keeping the upper arm stable to isolate the joint.',
@@ -60,6 +63,7 @@ abstract final class ExerciseLibrary {
       id: 'elbow-flexion-reach',
       joint: ExerciseJoint.elbow,
       title: 'Elbow Flexion Reach',
+      movementType: 'elbow_flexion',
       movementLabel: 'Elbow Flexion',
       description:
           'Bring the hand toward the shoulder with smooth elbow flexion to improve active range and control.',

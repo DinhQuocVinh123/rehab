@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx @gltf-transform/cli optimize assets/models/Adam.glb assets/models/Adam_opt.glb --texture-compress webp --texture-size 512 --no-draco)",
+      "Bash(npx @gltf-transform/cli optimize assets/models/Adam.glb assets/models/Adam_opt.glb --texture-compress webp --texture-size 512)",
+      "Bash(npx @gltf-transform/cli optimize assets/models/Adam.glb assets/models/Adam_opt.glb --texture-compress false)",
+      "Bash(npx @gltf-transform/cli resize --width 512 --height 512 assets/models/Adam.glb assets/models/Adam_resize.glb)",
+      "Bash(npx @gltf-transform/cli webp assets/models/Adam_resize.glb assets/models/Adam_opt.glb)",
+      "Bash(mkdir -p c:/rehab/rehab/assets/js)",
+      "Read(//c/tmp/**)",
+      "Bash(npm install:*)",
+      "Bash(cp /tmp/node_modules/three/build/three.min.js c:/rehab/rehab/assets/js/)",
+      "Bash(cp /tmp/node_modules/three/examples/js/loaders/GLTFLoader.js c:/rehab/rehab/assets/js/)",
+      "Bash(cp /tmp/node_modules/three/examples/js/controls/OrbitControls.js c:/rehab/rehab/assets/js/)",
+      "Read(//tmp/node_modules/three/**)",
+      "Read(//tmp/node_modules/three/examples/js/**)"
+    ]
+  }
+}

@@ -8,6 +8,7 @@ class ExerciseDefinition {
     required this.id,
     required this.joint,
     required this.title,
+    required this.movementType,
     required this.movementLabel,
     required this.description,
     required this.targetRange,
@@ -21,6 +22,8 @@ class ExerciseDefinition {
   final String id;
   final ExerciseJoint joint;
   final String title;
+  /// Raw movement type key, e.g. 'elbow_flexion'. Used to drive 3-D animation.
+  final String movementType;
   final String movementLabel;
   final String description;
   final String targetRange;
