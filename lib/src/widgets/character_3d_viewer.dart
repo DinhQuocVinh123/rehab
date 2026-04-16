@@ -31,6 +31,19 @@ const Map<String, _BoneMove> _movementMap = {
 };
 
 // ---------------------------------------------------------------------------
+// Controller
+// ---------------------------------------------------------------------------
+
+class Character3DController {
+  _Character3DViewerState? _state;
+
+  /// Drive the animated bone to [deg] degrees offset from its rest pose.
+  void setAngle(double deg) => _state?._setAngle(deg);
+
+  void dispose() => _state = null;
+}
+
+// ---------------------------------------------------------------------------
 // Widget
 // ---------------------------------------------------------------------------
 
@@ -40,6 +53,7 @@ class Character3DViewer extends StatefulWidget {
     required this.movementType,
     required this.startAngleDeg,
     required this.endAngleDeg,
+    this.controller,
     this.modelPath = 'assets/models/Adam_opt.glb',
     this.debugBones = false,
     this.useBakedPose = false,
@@ -54,6 +68,7 @@ class Character3DViewer extends StatefulWidget {
   final String movementType;
   final double startAngleDeg;
   final double endAngleDeg;
+  final Character3DController? controller;
   final String modelPath;
   final bool debugBones;
   final bool useBakedPose;
@@ -62,7 +77,7 @@ class Character3DViewer extends StatefulWidget {
   /// Override: set a fixed scale directly, bypassing auto-scale. Null = use auto-scale.
   final double? modelScale;
   final double cameraPositionY;
-  final double cameraPositionZ;   
+  final double cameraPositionZ;
   final double cameraTargetY;
   final double fov;
 
@@ -77,13 +92,19 @@ class _Character3DViewerState extends State<Character3DViewer> {
   @override
   void initState() {
     super.initState();
+    widget.controller?._state = this;
     _start();
   }
 
   @override
   void dispose() {
+    widget.controller?._state = null;
     _server?.close(force: true);
     super.dispose();
+  }
+
+  void _setAngle(double deg) {
+    _controller?.runJavaScript('window.setAngle($deg)');
   }
 
   Future<void> _start() async {
@@ -227,6 +248,15 @@ class _Character3DViewerState extends State<Character3DViewer> {
   var targetBones = [];
   var boneMap     = Object.create(null);
   var startTime   = null;
+  var boneBaseRot = {};
+
+  // Called from Flutter: sets the animated bone to [deg] degrees from rest pose
+  window.setAngle = function(deg) {
+    var rad = deg * Math.PI / 180;
+    for (var i = 0; i < targetBones.length; i++) {
+      targetBones[i].rotation[AXIS] = (boneBaseRot[i] || 0) + rad;
+    }
+  };
 
   // -- Easing
   function ease(t) {
@@ -330,6 +360,11 @@ class _Character3DViewerState extends State<Character3DViewer> {
       applyShannonSeatedPose();
     } else {
       applyStandingPose();
+    }
+
+    // Capture rest rotation for each animated bone (used by window.setAngle)
+    for (var i = 0; i < targetBones.length; i++) {
+      boneBaseRot[i] = targetBones[i].rotation[AXIS];
     }
 
     if (DEBUG) console.log('Target bones found:', targetBones.length);

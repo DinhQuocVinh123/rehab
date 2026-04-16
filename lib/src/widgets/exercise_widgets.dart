@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show lerpDouble;
 
@@ -5,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:rehab/src/data/elbow_exercise_svg.dart';
 import 'package:rehab/src/models/exercise.dart';
+import 'package:rehab/src/services/daq_ble_service.dart';
 import 'package:rehab/src/theme/app_colors.dart';
 import 'package:rehab/src/widgets/character_3d_viewer.dart';
 

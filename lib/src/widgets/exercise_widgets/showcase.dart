@@ -82,7 +82,7 @@ class ExerciseHeroCard extends StatelessWidget {
   }
 }
 
-class _KneeExerciseShowcase extends StatelessWidget {
+class _KneeExerciseShowcase extends StatefulWidget {
   const _KneeExerciseShowcase({
     required this.exercise,
     required this.accent,
@@ -92,7 +92,78 @@ class _KneeExerciseShowcase extends StatelessWidget {
   final Color accent;
 
   @override
+  State<_KneeExerciseShowcase> createState() => _KneeExerciseShowcaseState();
+}
+
+class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
+  final _viewer = Character3DController();
+  final _ble    = DaqBleService();
+
+  StreamSubscription<DaqSensorData>? _bleSub;
+  bool   _connecting    = false;
+  bool   _connected     = false;
+  String? _error;
+  int    _zeroTick      = 0;
+  double _currentAngle  = 0;
+
+  // Calibration constant — ticks per degree.
+  // Adjust after measuring: move joint 90° and read encoder delta.
+  static const double _ticksPerDeg = 50.0;
+
+  @override
+  void dispose() {
+    _bleSub?.cancel();
+    _ble.dispose();
+    _viewer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggleConnection() async {
+    if (_connected) {
+      await _bleSub?.cancel();
+      await _ble.disconnect();
+      setState(() { _connected = false; _currentAngle = 0; });
+      _viewer.setAngle(0);
+      return;
+    }
+
+    setState(() { _connecting = true; _error = null; });
+    try {
+      await _ble.connect();
+      bool firstReading = true;
+      _bleSub = _ble.dataStream.listen((data) {
+        if (data.encoderValues.isEmpty) return;
+        final tick = data.encoderValues[0];
+        if (firstReading) { _zeroTick = tick; firstReading = false; }
+        final angle = (tick - _zeroTick) / _ticksPerDeg;
+        setState(() => _currentAngle = angle);
+        _viewer.setAngle(angle);
+      });
+      setState(() { _connected = true; _connecting = false; });
+    } catch (e) {
+      setState(() { _error = e.toString(); _connecting = false; });
+    }
+  }
+
+  void _setZero() {
+    final sub = _bleSub;
+    if (sub == null) return;
+    sub.cancel();
+    bool firstReading = true;
+    _bleSub = _ble.dataStream.listen((data) {
+      if (data.encoderValues.isEmpty) return;
+      final tick = data.encoderValues[0];
+      if (firstReading) { _zeroTick = tick; firstReading = false; }
+      final angle = (tick - _zeroTick) / _ticksPerDeg;
+      setState(() => _currentAngle = angle);
+      _viewer.setAngle(angle);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final exercise = widget.exercise;
+    final accent = widget.accent;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -135,21 +206,64 @@ class _KneeExerciseShowcase extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(24),
               child: Character3DViewer(
+                controller: _viewer,
                 movementType: exercise.movementType,
                 startAngleDeg: exercise.startAngle,
                 endAngleDeg: exercise.endAngle,
                 modelPath: 'assets/models/Shannon_opt.glb',
                 modelScale: 0.01,
                 debugBones: false,
-                
-                
-                cameraPositionY: 0.15,
-                cameraPositionZ: 2.5,
-                cameraTargetY: 0.82,
-                
+                cameraPositionY: 0.5,
+                cameraPositionZ: 1.6,
+                cameraTargetY: 0.9,
+                fov: 65,
               ),
             ),
           ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              FilledButton.icon(
+                onPressed: _connecting ? null : _toggleConnection,
+                icon: Icon(_connected
+                    ? Icons.bluetooth_connected
+                    : Icons.bluetooth),
+                label: Text(_connecting
+                    ? 'Connecting...'
+                    : _connected
+                        ? 'Disconnect'
+                        : 'Connect Device'),
+                style: FilledButton.styleFrom(
+                  backgroundColor:
+                      _connected ? Colors.red.shade400 : accent,
+                ),
+              ),
+              if (_connected) ...[
+                const SizedBox(width: 12),
+                Text(
+                  '${_currentAngle.toStringAsFixed(1)}°',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.text,
+                  ),
+                ),
+                const Spacer(),
+                TextButton(
+                  onPressed: _setZero,
+                  child: const Text('Set Zero'),
+                ),
+              ],
+            ],
+          ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                _error!,
+                style: const TextStyle(color: Colors.red, fontSize: 12),
+              ),
+            ),
           const SizedBox(height: 22),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

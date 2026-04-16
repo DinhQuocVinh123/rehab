@@ -39,6 +39,7 @@ dependencies:
   flutter_svg: ^2.2.4
   model_viewer_plus: ^1.9.0
   webview_flutter: ^4.13.1
+  flutter_blue_plus: ^1.35.5
 
 dev_dependencies:
   flutter_test:
