@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node -e \"'mixamorig7_rightupleg'.slice\\(-'rightupleg'.length\\) === 'rightupleg' ? console.log\\('MATCH'\\) : console.log\\('NO MATCH'\\); 'mixamorig7_rightleg'.slice\\(-'rightupleg'.length\\) === 'rightupleg' ? console.log\\('WRONG MATCH'\\) : console.log\\('SAFE'\\)\")",
+      "Bash(sed -i 's/^import .package:flutter\\\\/material.dart.;/import '\\\\''package:flutter\\\\/foundation.dart'\\\\'';\\\\nimport '\\\\''package:flutter\\\\/gestures.dart'\\\\'';\\\\nimport '\\\\''package:flutter\\\\/material.dart'\\\\'';/' \"c:/rehab/rehab/lib/src/widgets/character_3d_viewer.dart\")",
+      "Bash(sed -i 's/return WebViewWidget\\(controller: _controller!\\);/return WebViewWidget\\(\\\\n      controller: _controller!,\\\\n      gestureRecognizers: {\\\\n        Factory<EagerGestureRecognizer>\\(\\(\\) => EagerGestureRecognizer\\(\\)\\),\\\\n      },\\\\n    \\);/' \"c:/rehab/rehab/lib/src/widgets/character_3d_viewer.dart\")",
+      "Bash(npx @gltf-transform/cli optimize assets/models/Shannon_opt.glb assets/models/Shannon_opt.glb --texture-compress webp --no-meshopt)",
+      "Bash(npx @gltf-transform/cli optimize --help)",
+      "Bash(npx @gltf-transform/cli optimize assets/models/Shannon_opt.glb assets/models/Shannon_opt.glb --texture-compress webp --compress draco)",
+      "Bash(npx @gltf-transform/cli optimize assets/models/Shannon_opt.glb assets/models/Shannon_opt.glb --texture-compress webp --compress false)"
+    ]
+  }
+}

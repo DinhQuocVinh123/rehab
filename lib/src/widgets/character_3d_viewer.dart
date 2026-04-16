@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:webview_flutter/webview_flutter.dart';
@@ -39,6 +42,9 @@ class Character3DViewer extends StatefulWidget {
     required this.endAngleDeg,
     this.modelPath = 'assets/models/Adam_opt.glb',
     this.debugBones = false,
+    this.useBakedPose = false,
+    this.modelScaleTarget = 1.8,
+    this.modelScale,
     this.cameraPositionY = 1.35,
     this.cameraPositionZ = 2.8,
     this.cameraTargetY = 1.15,
@@ -50,8 +56,13 @@ class Character3DViewer extends StatefulWidget {
   final double endAngleDeg;
   final String modelPath;
   final bool debugBones;
+  final bool useBakedPose;
+  /// Target height in world units for auto-scaling the model (default 1.8 for standing).
+  final double modelScaleTarget;
+  /// Override: set a fixed scale directly, bypassing auto-scale. Null = use auto-scale.
+  final double? modelScale;
   final double cameraPositionY;
-  final double cameraPositionZ;
+  final double cameraPositionZ;   
   final double cameraTargetY;
   final double fov;
 
@@ -105,7 +116,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
         res
           ..statusCode = HttpStatus.ok
           ..headers.add('Content-Type', 'text/html;charset=UTF-8')
-          ..add(html.codeUnits);
+          ..add(utf8.encode(html));
       } else if (path == '/model') {
         final data = await rootBundle.load(widget.modelPath);
         final bytes = data.buffer.asUint8List();
@@ -145,6 +156,8 @@ class _Character3DViewerState extends State<Character3DViewer> {
     final startRad = widget.startAngleDeg * 3.14159265 / 180 * sign;
     final endRad = widget.endAngleDeg * 3.14159265 / 180 * sign;
     final debug = widget.debugBones ? 'true' : 'false';
+    final scaleTarget = widget.modelScaleTarget;
+    final fixedScale = widget.modelScale != null ? widget.modelScale.toString() : 'null';
     final camY = widget.cameraPositionY;
     final camZ = widget.cameraPositionZ;
     final tgtY = widget.cameraTargetY;
@@ -194,74 +207,141 @@ class _Character3DViewerState extends State<Character3DViewer> {
   dirLight.position.set(2, 4, 3);
   scene.add(dirLight);
 
-  // ── Animation params ──────────────────────────────────────────────────
-  var SUFFIX   = '$suffix';
-  var AXIS     = '$axis';
-  var START    = $startRad;
-  var END      = $endRad;
-  var DURATION = 2800;
-  var ARM_DOWN = -1.5708; // -π/2
-  var DEBUG    = $debug;
+  // -- Animation params
+  var SUFFIX          = '$suffix';
+  var AXIS            = '$axis';
+  var START           = $startRad;
+  var END             = $endRad;
+  var DURATION        = 2800;
+  var ARM_DOWN        = -1.5708;
+  var IS_KNEE         = SUFFIX.indexOf('leg') !== -1;
+  var DEBUG           = $debug;
+
+  // For knee exercises, camera goes to the side (+X axis) for a profile view
+  if (IS_KNEE) {
+    camera.position.set($camZ, $camY, 0);
+    controls.target.set(0, $tgtY, 0);
+    controls.update();
+  }
 
   var targetBones = [];
+  var boneMap     = Object.create(null);
   var startTime   = null;
 
-  // ── Easing ────────────────────────────────────────────────────────────
+  // -- Easing
   function ease(t) {
     return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
   }
 
-  // ── Load model ────────────────────────────────────────────────────────
+  // Set all 3 rotation axes on a bone found by name suffix
+  function poseBone(suffix, x, y, z) {
+    for (var k in boneMap) {
+      if (k.length >= suffix.length && k.slice(-suffix.length) === suffix) {
+        boneMap[k].rotation.set(x, y, z); return;
+      }
+    }
+  }
+
+  function applyKneePose() {
+    poseBone('rightarm',    0, 0, -1.5708);
+    poseBone('leftarm',     0, 0,  1.5708);
+    poseBone('rightupleg',  1.5708, 0, 0);
+    poseBone('leftupleg',   1.5708, 0, 0);
+    poseBone('leftleg',     1.5708, 0, 0);
+    poseBone('leftfoot',   -0.5,   0, 0);
+  }
+
+  function poseBoneQuat(suffix, x, y, z, w) {
+    for (var k in boneMap) {
+      if (k.indexOf(suffix) !== -1) {
+        boneMap[k].quaternion.set(x, y, z, w);
+        return;
+      }
+    }
+  }
+
+  function applyShannonSeatedPose() {
+    poseBoneQuat('hips', -0.0753, -0.0098, 0.0193, 0.9969);
+    poseBoneQuat('spine', 0.1069, -0.0052, -0.0354, 0.9936);
+    poseBoneQuat('spine1', 0.0254, -0.0005, -0.0034, 0.9997);
+    poseBoneQuat('spine2', 0.0155, -0.0005, -0.0035, 0.9999);
+    poseBoneQuat('leftupleg', 0.0823, 0.6964, 0.7074, -0.0889);
+    poseBoneQuat('leftleg', -0.7106, 0.0215, -0.0930, 0.6971);
+    poseBoneQuat('leftfoot', 0.4360, -0.0251, 0.0927, 0.8948);
+    poseBoneQuat('rightupleg', -0.0481, 0.7124, 0.6976, 0.0588);
+    poseBoneQuat('rightleg', -0.7360, 0.0738, -0.0321, 0.6722);
+    poseBoneQuat('rightfoot', 0.4699, 0.0235, -0.1260, 0.8734);
+    poseBoneQuat('leftarm', 0.3270, -0.0329, 0.1865, 0.9258);
+    poseBoneQuat('leftforearm', 0.0463, -0.0014, 0.4554, 0.8891);
+    poseBoneQuat('rightarm', 0.2796, 0.0176, -0.3194, 0.9053);
+    poseBoneQuat('rightforearm', 0.0290, 0.0017, -0.2899, 0.9566);
+  }
+
+  function applyStandingPose() {
+    poseBoneQuat('hips', -0.0080, -0.0497, -0.0267, 0.9984);
+    poseBoneQuat('spine', -0.0199, 0.0028, 0.0127, 0.9997);
+    poseBoneQuat('spine1', 0.0197, 0.0050, 0.0273, 0.9994);
+    poseBoneQuat('spine2', 0.0197, 0.0050, 0.0273, 0.9994);
+    poseBoneQuat('leftshoulder', 0.6469, 0.3303, -0.5927, 0.3480);
+    poseBoneQuat('leftarm', 0.3943, 0.1905, 0.0691, 0.8964);
+    poseBoneQuat('leftforearm', 0.0064, -0.0044, 0.1181, 0.9930);
+    poseBoneQuat('lefthand', -0.0887, -0.1386, 0.0911, 0.9821);
+    poseBoneQuat('rightshoulder', 0.6193, -0.3573, 0.6050, 0.3504);
+    poseBoneQuat('rightarm', 0.3822, -0.2687, -0.0377, 0.8834);
+    poseBoneQuat('rightforearm', 0.0081, 0.0041, -0.1491, 0.9888);
+    poseBoneQuat('righthand', -0.1787, 0.2564, -0.0486, 0.9487);
+    poseBoneQuat('leftupleg', 0.0227, 0.1227, 0.9892, -0.0773);
+    poseBoneQuat('leftleg', -0.1631, -0.0006, -0.0120, 0.9865);
+    poseBoneQuat('leftfoot', 0.4550, -0.1841, 0.0930, 0.8663);
+    poseBoneQuat('rightupleg', -0.0582, -0.0008, 0.9968, -0.0549);
+    poseBoneQuat('rightleg', -0.0714, -0.0001, 0.0089, 0.9974);
+    poseBoneQuat('rightfoot', 0.5011, 0.1025, -0.1151, 0.8515);
+  }
+
+  // -- Load model
   var loader = new THREE.GLTFLoader();
   loader.load('/model', function(gltf) {
     var model = gltf.scene;
 
-    // Auto-scale: normalize height to 1.8 world units
     var box = new THREE.Box3().setFromObject(model);
     var height = box.max.y - box.min.y;
-    if (height > 0) model.scale.setScalar(1.8 / height);
+    var fixedScale = $fixedScale;
+    var finalScale = fixedScale !== null ? fixedScale : (height > 0 ? $scaleTarget / height : 1);
+    model.scale.setScalar(finalScale);
 
     scene.add(model);
 
-    // Place feet at y=0, center x/z
     box.setFromObject(model);
     var center = box.getCenter(new THREE.Vector3());
     model.position.x -= center.x;
     model.position.z -= center.z;
     model.position.y -= box.min.y;
 
-    // Collect bones + setup pose
+    // Build bone map + collect target bones
     model.traverse(function(obj) {
       if (!obj.isBone) return;
       var n = obj.name.toLowerCase();
-
+      boneMap[n] = obj;
+      if (SUFFIX && n.indexOf(SUFFIX) !== -1) targetBones.push(obj);
       if (DEBUG) console.log('Bone:', obj.name);
-
-      // Arms down from T-pose
-      if (n.indexOf('rightarm') !== -1 && n.indexOf('forearm') === -1 && n.indexOf('hand') === -1) {
-        obj.rotation.set(0, 0, ARM_DOWN);
-      }
-      if (n.indexOf('leftarm') !== -1 && n.indexOf('forearm') === -1 && n.indexOf('hand') === -1) {
-        obj.rotation.set(0, 0, -ARM_DOWN);
-      }
-
-      // Target bones for animation
-      if (SUFFIX && n.indexOf(SUFFIX) !== -1) {
-        targetBones.push(obj);
-        if (DEBUG) console.log('Target bone:', obj.name);
-      }
     });
+
+    if (IS_KNEE) {
+      applyShannonSeatedPose();
+    } else {
+      applyStandingPose();
+    }
 
     if (DEBUG) console.log('Target bones found:', targetBones.length);
   }, undefined, function(err) {
     console.error('GLTFLoader error:', err);
   });
 
-  // ── Render loop ───────────────────────────────────────────────────────
+  // -- Render loop
   function animate(ts) {
     requestAnimationFrame(animate);
 
-    if (targetBones.length > 0) {
+    if (false && targetBones.length > 0) {
       if (!startTime) startTime = ts;
       var elapsed = (ts - startTime) % (DURATION * 2);
       var raw = elapsed < DURATION ? elapsed / DURATION : 2 - elapsed / DURATION;
@@ -293,6 +373,11 @@ class _Character3DViewerState extends State<Character3DViewer> {
     if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    return WebViewWidget(controller: _controller!);
+    return WebViewWidget(
+      controller: _controller!,
+      gestureRecognizers: {
+        Factory<EagerGestureRecognizer>(() => EagerGestureRecognizer()),
+      },
+    );
   }
 }
