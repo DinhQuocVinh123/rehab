@@ -102,20 +102,83 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
   StreamSubscription<DaqSensorData>? _bleSub;
   bool   _connecting    = false;
   bool   _connected     = false;
+  bool   _wsConnected   = false;
   String? _error;
   int    _zeroTick      = 0;
   double _currentAngle  = 0;
 
-  // Calibration constant — ticks per degree.
-  // Adjust after measuring: move joint 90° and read encoder delta.
+  // Demo mode
+  Timer?  _demoTimer;
+  bool    _demoRunning  = false;
+  double  _demoPhase    = 0;
+
   static const double _ticksPerDeg = 50.0;
+  static const int    _encoderIndex = 1; // sensor[1] = knee encoder
 
   @override
   void dispose() {
+    _demoTimer?.cancel();
     _bleSub?.cancel();
     _ble.dispose();
     _viewer.dispose();
     super.dispose();
+  }
+
+  void _toggleDemo() {
+    if (_demoRunning) {
+      _demoTimer?.cancel();
+      setState(() { _demoRunning = false; _currentAngle = 0; });
+      _viewer.setAngle(0);
+      return;
+    }
+    _demoPhase = 0;
+    setState(() => _demoRunning = true);
+
+    // Dùng đúng format packet của KNEESENSE3 (từ nRF screenshot).
+    // Vary encoder của sensor[0] (bytes[9..10]) để tạo chuyển động.
+    // Range: 0 → 4500 ticks (≈ 0°–90° với ticksPerDeg=50)
+    _demoTimer = Timer.periodic(const Duration(milliseconds: 32), (_) {
+      _demoPhase += 0.035;
+      final ticks = (4500 * (1 - math.cos(_demoPhase)) / 2).round(); // 0–4500
+      final encLow  = ticks & 0xFF;
+      final encHigh = (ticks >> 8) & 0xFF;
+
+      // Build packet: copy sample, ghi đè encoder bytes của sensor[0]
+      final packet = List<int>.from(DaqBleService.samplePacketBytes);
+      packet[9]  = encLow;   // encoder low byte
+      packet[10] = encHigh;  // encoder high byte
+
+      final data = DaqBleService.parsePacket(Uint8List.fromList(packet));
+      if (data == null) return;
+      final angle = data.encoderValues[_encoderIndex] / _ticksPerDeg;
+      setState(() => _currentAngle = angle);
+      _viewer.setAngle(angle);
+    });
+  }
+
+  Future<void> _toggleWsConnection() async {
+    if (_wsConnected) {
+      await _ble.disconnectWebSocket();
+      setState(() { _wsConnected = false; _currentAngle = 0; });
+      _viewer.setAngle(0);
+      return;
+    }
+    setState(() { _connecting = true; _error = null; });
+    try {
+      await _ble.connectViaWebSocket();
+      bool firstReading = true;
+      _bleSub = _ble.dataStream.listen((data) {
+        if (data.encoderValues.length <= _encoderIndex) return;
+        final tick = data.encoderValues[_encoderIndex];
+        if (firstReading) { _zeroTick = tick; firstReading = false; }
+        final angle = (tick - _zeroTick) / _ticksPerDeg;
+        setState(() => _currentAngle = angle);
+        _viewer.setAngle(angle);
+      });
+      setState(() { _wsConnected = true; _connecting = false; });
+    } catch (e) {
+      setState(() { _error = e.toString(); _connecting = false; });
+    }
   }
 
   Future<void> _toggleConnection() async {
@@ -132,8 +195,8 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
       await _ble.connect();
       bool firstReading = true;
       _bleSub = _ble.dataStream.listen((data) {
-        if (data.encoderValues.isEmpty) return;
-        final tick = data.encoderValues[0];
+        if (data.encoderValues.length <= _encoderIndex) return;
+        final tick = data.encoderValues[_encoderIndex];
         if (firstReading) { _zeroTick = tick; firstReading = false; }
         final angle = (tick - _zeroTick) / _ticksPerDeg;
         setState(() => _currentAngle = angle);
@@ -151,8 +214,8 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
     sub.cancel();
     bool firstReading = true;
     _bleSub = _ble.dataStream.listen((data) {
-      if (data.encoderValues.isEmpty) return;
-      final tick = data.encoderValues[0];
+      if (data.encoderValues.length <= _encoderIndex) return;
+      final tick = data.encoderValues[_encoderIndex];
       if (firstReading) { _zeroTick = tick; firstReading = false; }
       final angle = (tick - _zeroTick) / _ticksPerDeg;
       setState(() => _currentAngle = angle);
@@ -238,7 +301,19 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
                       _connected ? Colors.red.shade400 : accent,
                 ),
               ),
-              if (_connected) ...[
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: _connected ? null : _toggleDemo,
+                icon: Icon(_demoRunning ? Icons.stop : Icons.play_arrow),
+                label: Text(_demoRunning ? 'Stop' : 'Demo'),
+              ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: (_connected || _demoRunning) ? null : _toggleWsConnection,
+                icon: Icon(_wsConnected ? Icons.wifi_off : Icons.wifi),
+                label: Text(_wsConnected ? 'Disconnect' : 'Bridge'),
+              ),
+              if (_connected || _demoRunning || _wsConnected) ...[
                 const SizedBox(width: 12),
                 Text(
                   '${_currentAngle.toStringAsFixed(1)}°',
@@ -248,11 +323,13 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
                     color: AppColors.text,
                   ),
                 ),
-                const Spacer(),
-                TextButton(
-                  onPressed: _setZero,
-                  child: const Text('Set Zero'),
-                ),
+                if (_connected || _wsConnected) ...[
+                  const Spacer(),
+                  TextButton(
+                    onPressed: _setZero,
+                    child: const Text('Set Zero'),
+                  ),
+                ],
               ],
             ],
           ),

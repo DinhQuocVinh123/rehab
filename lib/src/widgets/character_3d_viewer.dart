@@ -93,7 +93,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
   void initState() {
     super.initState();
     widget.controller?._state = this;
-    _start();
+    if (!Platform.isWindows) _start();
   }
 
   @override
@@ -405,6 +405,25 @@ class _Character3DViewerState extends State<Character3DViewer> {
 
   @override
   Widget build(BuildContext context) {
+    if (Platform.isWindows) {
+      return Container(
+        color: const Color(0xFF1A1A2E),
+        child: const Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.view_in_ar, size: 48, color: Colors.white38),
+              SizedBox(height: 12),
+              Text(
+                '3D Viewer không hỗ trợ trên Windows\nVui lòng test trên Android',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38, fontSize: 13),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     if (_controller == null) {
       return const Center(child: CircularProgressIndicator());
     }
