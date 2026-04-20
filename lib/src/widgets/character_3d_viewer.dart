@@ -20,8 +20,8 @@ class _BoneMove {
 }
 
 const Map<String, _BoneMove> _movementMap = {
-  'elbow_flexion':      _BoneMove('rightforearm', axis: 'x', sign:  1),
-  'elbow_extension':    _BoneMove('rightforearm', axis: 'x', sign: -1),
+  'elbow_flexion':      _BoneMove('rightforearm', axis: 'z', sign:  1),
+  'elbow_extension':    _BoneMove('rightforearm', axis: 'z', sign: -1),
   'forearm_pronation':  _BoneMove('rightforearm', axis: 'y', sign:  1),
   'forearm_supination': _BoneMove('rightforearm', axis: 'y', sign: -1),
   'wrist_flexion':      _BoneMove('righthand',    axis: 'x', sign:  1),
@@ -231,6 +231,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
   // -- Animation params
   var SUFFIX          = '$suffix';
   var AXIS            = '$axis';
+  var SIGN            = $sign;
   var START           = $startRad;
   var END             = $endRad;
   var DURATION        = 2800;
@@ -252,7 +253,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
 
   // Called from Flutter: sets the animated bone to [deg] degrees from rest pose
   window.setAngle = function(deg) {
-    var rad = deg * Math.PI / 180;
+    var rad = deg * Math.PI / 180 * SIGN;
     for (var i = 0; i < targetBones.length; i++) {
       targetBones[i].rotation[AXIS] = (boneBaseRot[i] || 0) + rad;
     }
