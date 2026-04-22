@@ -59,6 +59,7 @@ class Character3DViewer extends StatefulWidget {
     this.useBakedPose = false,
     this.modelScaleTarget = 1.8,
     this.modelScale,
+    this.useSittingPose = false,
     this.modelRotationY = 0.0,
     this.cameraPositionX = 0.0,
     this.cameraPositionY = 1.35,
@@ -68,6 +69,7 @@ class Character3DViewer extends StatefulWidget {
     this.ghostColor = 0x22CC66,
     this.ghostAngleDeg,
     this.ghostOffsetX = 0.0,
+    this.ghostOffsetY = 0.0,
     this.ghostOffsetZ = 0.0,
     this.ghostSign,
   });
@@ -83,6 +85,7 @@ class Character3DViewer extends StatefulWidget {
   final double modelScaleTarget;
   /// Override: set a fixed scale directly, bypassing auto-scale. Null = use auto-scale.
   final double? modelScale;
+  final bool   useSittingPose;
   final double modelRotationY;
   final double cameraPositionX;
   final double cameraPositionY;
@@ -95,6 +98,7 @@ class Character3DViewer extends StatefulWidget {
   final double? ghostAngleDeg;
   /// X-axis offset in world units for the ghost arm position (negative = left).
   final double ghostOffsetX;
+  final double ghostOffsetY;
   /// Z-axis offset in world units for the ghost arm position.
   final double ghostOffsetZ;
   /// Override the sign used for ghost angle calculation. Null = use movement sign.
@@ -201,9 +205,11 @@ class _Character3DViewerState extends State<Character3DViewer> {
     final effectiveGhostSign = widget.ghostSign ?? sign;
     final ghostRad = ghostAngle * 3.14159265 / 180 * effectiveGhostSign;
     final ghostOffsetX = widget.ghostOffsetX;
+    final ghostOffsetY = widget.ghostOffsetY;
     final ghostOffsetZ = widget.ghostOffsetZ;
     final scaleTarget = widget.modelScaleTarget;
     final fixedScale = widget.modelScale != null ? widget.modelScale.toString() : 'null';
+    final useSitting = widget.useSittingPose ? 'true' : 'false';
     final modelRotY = widget.modelRotationY;
     final camX = widget.cameraPositionX;
     final camY = widget.cameraPositionY;
@@ -264,10 +270,12 @@ class _Character3DViewerState extends State<Character3DViewer> {
   var GHOST_COLOR     = $ghostColor;
   var GHOST_END       = $ghostRad;
   var GHOST_OFFSET_X  = $ghostOffsetX;
+  var GHOST_OFFSET_Y  = $ghostOffsetY;
   var GHOST_OFFSET_Z  = $ghostOffsetZ;
   var DURATION        = 2800;
   var ARM_DOWN        = -1.5708;
   var IS_KNEE         = SUFFIX.indexOf('leg') !== -1;
+  var USE_SITTING     = $useSitting;
   var DEBUG           = $debug;
 
   // For knee exercises, camera goes to the side (+X axis) for a profile view
@@ -340,6 +348,28 @@ class _Character3DViewerState extends State<Character3DViewer> {
     poseBoneQuat('rightforearm', 0.0290, 0.0017, -0.2899, 0.9566);
   }
 
+  function applyAdamSeatedPose() {
+    // Body/legs: Shannon seated quaternions (same bone structure, compatible bind pose)
+    poseBoneQuat('hips',      -0.0753, -0.0098,  0.0193,  0.9969);
+    poseBoneQuat('spine',      0.1069, -0.0052, -0.0354,  0.9936);
+    poseBoneQuat('spine1',     0.0254, -0.0005, -0.0034,  0.9997);
+    poseBoneQuat('spine2',     0.0155, -0.0005, -0.0035,  0.9999);
+    poseBoneQuat('leftupleg',  0.0823,  0.6964,  0.7074, -0.0889);
+    poseBoneQuat('leftleg',   -0.7106,  0.0215, -0.0930,  0.6971);
+    poseBoneQuat('leftfoot',   0.4360, -0.0251,  0.0927,  0.8948);
+    poseBoneQuat('rightupleg',-0.0481,  0.7124,  0.6976,  0.0588);
+    poseBoneQuat('rightleg',  -0.7360,  0.0738, -0.0321,  0.6722);
+    poseBoneQuat('rightfoot',  0.4699,  0.0235, -0.1260,  0.8734);
+    // Arms: Shannon seated quaternions — must match Shannon body quaternions above
+    // (no shoulder bones in Shannon's pose, leave at bind pose)
+    poseBoneQuat('leftarm',       0.3270, -0.0329,  0.1865,  0.9258);
+    poseBoneQuat('leftforearm',   0.0463, -0.0014,  0.4554,  0.8891);
+    poseBoneQuat('lefthand',     -0.0887, -0.1386,  0.0911,  0.9821);
+    poseBoneQuat('rightarm',      0.2796,  0.0176, -0.3194,  0.9053);
+    poseBoneQuat('rightforearm',  0.0290,  0.0017, -0.2899,  0.9566);
+    poseBoneQuat('righthand',    -0.1787,  0.2564, -0.0486,  0.9487);
+  }
+
   function applyStandingPose() {
     poseBoneQuat('hips', -0.0080, -0.0497, -0.0267, 0.9984);
     poseBoneQuat('spine', -0.0199, 0.0028, 0.0127, 0.9997);
@@ -392,6 +422,8 @@ class _Character3DViewerState extends State<Character3DViewer> {
 
     if (IS_KNEE) {
       applyShannonSeatedPose();
+    } else if (USE_SITTING) {
+      applyAdamSeatedPose();
     } else {
       applyStandingPose();
     }
@@ -451,6 +483,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
       var elbowPos = new THREE.Vector3();
       bone.getWorldPosition(elbowPos);
       elbowPos.x += GHOST_OFFSET_X;
+      elbowPos.y += GHOST_OFFSET_Y;
       elbowPos.z += GHOST_OFFSET_Z;
       ghostMesh.position.copy(elbowPos);
 
