@@ -125,6 +125,27 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
   static const double _emaAlpha      = 0.20;
   static const double _fallbackMax   = 2000.0; // tick value that maps to 90°
 
+  static const double _ghostMin   = 15.0;
+  static const double _ghostMax   = 85.0;
+  static const double _ghostStep  = 30.0;
+  static const double _ghostHit   = 4.0;
+  final _rng = math.Random();
+  double _ghostAngle = 15.0;
+  bool   _ghostAbove = true;
+
+  void _advanceGhost() {
+    final candidates = <double>[];
+    var angle = _ghostMin;
+    while (angle <= _ghostMax) {
+      if ((angle - _ghostAngle).abs() >= _ghostStep) candidates.add(angle);
+      angle += 5.0;
+    }
+    if (candidates.isEmpty) return;
+    _ghostAngle = candidates[_rng.nextInt(candidates.length)];
+    _ghostAbove = _ghostAngle > _currentAngle;
+    _viewer.setGhostAngle(_ghostAngle);
+  }
+
   bool get _isCalibrated => _tick0 != null && _tick45 != null && _tick90 != null;
 
   double _tickToAngle(double tick) {
@@ -166,6 +187,12 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
         final next = diff.abs() < 1.5 ? _targetAngle : _currentAngle + diff * _lerpSpeed;
         _currentAngle = next;
         _viewer.setAngle(next);
+
+        // Advance ghost when user reaches it (direction-aware)
+        final reached = _ghostAbove
+            ? _currentAngle >= _ghostAngle - _ghostHit
+            : _currentAngle <= _ghostAngle + _ghostHit;
+        if (reached) _advanceGhost();
       }
       setState(() {});
     });
@@ -176,8 +203,15 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
       _smoothTimer?.cancel();
       await _bleSub?.cancel();
       await _ble.disconnectWebSocket();
-      setState(() { _wsConnected = false; _targetAngle = 0; _currentAngle = 0; });
+      setState(() {
+        _wsConnected = false;
+        _targetAngle = 0;
+        _currentAngle = 0;
+        _ghostAngle = _ghostMin;
+        _ghostAbove = true;
+      });
       _viewer.setAngle(0);
+      _viewer.setGhostAngle(_ghostMin);
       return;
     }
     setState(() { _connecting = true; _error = null; });
@@ -287,7 +321,7 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
                 cameraTargetY: 0.9,
                 fov: 65,
                 ghostColor: accent.toARGB32() & 0xFFFFFF,
-                ghostAngleDeg: 90,
+                ghostAngleDeg: _ghostMin,
                 ghostSign: 1.0,
               ),
             ),
@@ -505,6 +539,30 @@ class _ElbowExerciseShowcaseState extends State<_ElbowExerciseShowcase> {
   static const double _ticksPerDeg   = 15.8;
   static const double _emaAlpha      = 0.15; // lower = smoother, slower
   static const double _angleDeadzone = 1.0;  // ignore changes < 1°
+
+  static const double _ghostMin   = 15.0;
+  static const double _ghostMax   = 110.0;
+  static const double _ghostStep  = 30.0;
+  static const double _ghostHit   = 4.0;   // degrees tolerance to count as "reached"
+  final _rng = math.Random();
+  double _ghostAngle    = 30.0;
+  bool   _ghostAbove    = true; // true = ghost is above arm (user must raise arm)
+
+  // Pick next angle at least _ghostStep away from current ghost angle.
+  // Also records whether the new target is above or below the current arm.
+  void _advanceGhost() {
+    final candidates = <double>[];
+    var angle = _ghostMin;
+    while (angle <= _ghostMax) {
+      if ((angle - _ghostAngle).abs() >= _ghostStep) candidates.add(angle);
+      angle += 5.0;
+    }
+    if (candidates.isEmpty) return;
+    _ghostAngle = candidates[_rng.nextInt(candidates.length)];
+    _ghostAbove = _ghostAngle > _currentAngle;
+    _viewer.setGhostAngle(_ghostAngle);
+  }
+
   @override
   void dispose() {
     _smoothTimer?.cancel();
@@ -522,6 +580,12 @@ class _ElbowExerciseShowcaseState extends State<_ElbowExerciseShowcase> {
       final next = _currentAngle + diff * _lerpSpeed;
       setState(() => _currentAngle = next);
       _viewer.setAngle(next);
+
+      // Advance ghost when user reaches it (direction-aware to avoid false triggers)
+      final reached = _ghostAbove
+          ? _currentAngle >= _ghostAngle - _ghostHit
+          : _currentAngle <= _ghostAngle + _ghostHit;
+      if (reached) _advanceGhost();
     });
   }
 
@@ -530,8 +594,15 @@ class _ElbowExerciseShowcaseState extends State<_ElbowExerciseShowcase> {
       _smoothTimer?.cancel();
       await _bleSub?.cancel();
       await _ble.disconnectWebSocket();
-      setState(() { _wsConnected = false; _targetAngle = 0; _currentAngle = 0; });
+      setState(() {
+        _wsConnected = false;
+        _targetAngle = 0;
+        _currentAngle = 0;
+        _ghostAngle = _ghostMin;
+        _ghostAbove = true;
+      });
       _viewer.setAngle(0);
+      _viewer.setGhostAngle(_ghostMin);
       return;
     }
     setState(() { _connecting = true; _error = null; });
@@ -617,7 +688,7 @@ class _ElbowExerciseShowcaseState extends State<_ElbowExerciseShowcase> {
                 cameraPositionZ: 1.0,
                 cameraTargetY: 0.9,
                 ghostColor: accent.toARGB32() & 0xFFFFFF,
-                ghostAngleDeg: 90,
+                ghostAngleDeg: _ghostMin,
                 ghostOffsetY: 0.0,
               ),
             ),

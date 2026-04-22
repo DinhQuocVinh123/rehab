@@ -40,6 +40,9 @@ class Character3DController {
   /// Drive the animated bone to [deg] degrees offset from its rest pose.
   void setAngle(double deg) => _state?._setAngle(deg);
 
+  /// Move the ghost arm to a new target angle (degrees).
+  void setGhostAngle(double deg) => _state?._setGhostAngle(deg);
+
   void dispose() => _state = null;
 }
 
@@ -130,6 +133,10 @@ class _Character3DViewerState extends State<Character3DViewer> {
     _controller?.runJavaScript('window.setAngle($deg)');
   }
 
+  void _setGhostAngle(double deg) {
+    _controller?.runJavaScript('window.setGhostAngle($deg)');
+  }
+
   Future<void> _start() async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server = server;
@@ -204,6 +211,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
     final ghostAngle = widget.ghostAngleDeg ?? widget.endAngleDeg;
     final effectiveGhostSign = widget.ghostSign ?? sign;
     final ghostRad = ghostAngle * 3.14159265 / 180 * effectiveGhostSign;
+    final effectiveGhostSignJs = effectiveGhostSign;
     final ghostOffsetX = widget.ghostOffsetX;
     final ghostOffsetY = widget.ghostOffsetY;
     final ghostOffsetZ = widget.ghostOffsetZ;
@@ -269,6 +277,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
   var END             = $endRad;
   var GHOST_COLOR     = $ghostColor;
   var GHOST_END       = $ghostRad;
+  var GHOST_SIGN      = $effectiveGhostSignJs;
   var GHOST_OFFSET_X  = $ghostOffsetX;
   var GHOST_OFFSET_Y  = $ghostOffsetY;
   var GHOST_OFFSET_Z  = $ghostOffsetZ;
@@ -297,6 +306,11 @@ class _Character3DViewerState extends State<Character3DViewer> {
     for (var i = 0; i < targetBones.length; i++) {
       targetBones[i].rotation[AXIS] = (boneBaseRot[i] || 0) + rad;
     }
+  };
+
+  // Called from Flutter: moves the ghost arm to a new target angle
+  window.setGhostAngle = function(deg) {
+    GHOST_END = deg * Math.PI / 180 * GHOST_SIGN;
   };
 
   // -- Easing
