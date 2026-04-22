@@ -104,13 +104,50 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
   bool    _connecting   = false;
   bool    _wsConnected  = false;
   String? _error;
-  int     _zeroTick     = 0;
-  double  _targetAngle  = 0;
-  double  _currentAngle = 0;
+  int     _rawTick       = 0;
+  int     _packetCount   = 0;
+  double  _ema1          = 0;
+  double  _smoothedTick  = 0; // output after median + EMA
+  double  _targetAngle   = 0;
+  double  _currentAngle  = 0;
+  bool    _showDebug     = false;
 
-  static const double _ticksPerDeg  = 50.0;
-  static const int    _encoderIndex = 1;
-  static const double _lerpSpeed    = 0.12;
+  // Median filter buffer (5 samples)
+  final List<double> _medBuf = [];
+
+  // 3-point calibration ticks
+  double? _tick0;   // leg normal (0°)
+  double? _tick45;  // leg mid (45°)
+  double? _tick90;  // leg straight (90°)
+
+  static const int    _encoderIndex  = 1;
+  static const double _lerpSpeed     = 0.18;
+  static const double _emaAlpha      = 0.20;
+  static const double _fallbackMax   = 2000.0; // tick value that maps to 90°
+
+  bool get _isCalibrated => _tick0 != null && _tick45 != null && _tick90 != null;
+
+  double _tickToAngle(double tick) {
+    if (!_isCalibrated) return 0;
+    final t0 = _tick0!, t45 = _tick45!, t90 = _tick90!;
+    if ((t90 - t0).abs() < 1) return 0;
+    // piecewise linear: t0→t45 = 0°→45°, t45→t90 = 45°→90°
+    if ((t45 - t0).abs() > 1 && _between(tick, t0, t45)) {
+      return 45.0 * (tick - t0) / (t45 - t0);
+    }
+    if ((t90 - t45).abs() > 1 && _between(tick, t45, t90)) {
+      return 45.0 + 45.0 * (tick - t45) / (t90 - t45);
+    }
+    // outside range: clamp
+    if ((t90 - t0) > 0) {
+      return (tick <= t0) ? 0.0 : 90.0;
+    } else {
+      return (tick >= t0) ? 0.0 : 90.0;
+    }
+  }
+
+  bool _between(double v, double a, double b) =>
+      (a <= b) ? (v >= a && v <= b) : (v <= a && v >= b);
 
   @override
   void dispose() {
@@ -125,10 +162,12 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
     _smoothTimer?.cancel();
     _smoothTimer = Timer.periodic(const Duration(milliseconds: 16), (_) {
       final diff = _targetAngle - _currentAngle;
-      if (diff.abs() < 0.05) return;
-      final next = _currentAngle + diff * _lerpSpeed;
-      setState(() => _currentAngle = next);
-      _viewer.setAngle(next);
+      if (diff.abs() >= 0.8) {
+        final next = diff.abs() < 1.5 ? _targetAngle : _currentAngle + diff * _lerpSpeed;
+        _currentAngle = next;
+        _viewer.setAngle(next);
+      }
+      setState(() {});
     });
   }
 
@@ -148,8 +187,29 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
       _bleSub = _ble.dataStream.listen((data) {
         if (data.encoderValues.length <= _encoderIndex) return;
         final tick = data.encoderValues[_encoderIndex];
-        if (firstReading) { _zeroTick = tick; firstReading = false; }
-        _targetAngle = ((tick - _zeroTick) / _ticksPerDeg).clamp(-130.0, 130.0);
+        _rawTick = tick;
+        _packetCount++;
+        final t = tick.toDouble();
+        if (firstReading) {
+          _ema1 = t; _smoothedTick = t;
+          _medBuf.clear();
+          firstReading = false;
+        }
+        // Stage 1: median filter (window=5) — removes spikes
+        _medBuf.add(t);
+        if (_medBuf.length > 5) _medBuf.removeAt(0);
+        final sorted = List<double>.from(_medBuf)..sort();
+        final median = sorted[sorted.length ~/ 2];
+        // Single-stage EMA low-pass (faster response)
+        _ema1 = _ema1 * (1 - _emaAlpha) + median * _emaAlpha;
+        _smoothedTick = _ema1;
+        if (_isCalibrated) {
+          _targetAngle = _tickToAngle(_smoothedTick);
+        } else {
+          // Fallback: use tick0 if pressed, else baseTick as the rest reference.
+          // Extension = tick increasing above ref.
+          _targetAngle = (_smoothedTick / _fallbackMax * 90.0).clamp(0.0, 90.0);
+        }
       });
       _startSmoothTimer();
       setState(() { _wsConnected = true; _connecting = false; });
@@ -158,14 +218,12 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
     }
   }
 
-  void _setZero() {
-    _bleSub?.cancel();
-    bool firstReading = true;
-    _bleSub = _ble.dataStream.listen((data) {
-      if (data.encoderValues.length <= _encoderIndex) return;
-      final tick = data.encoderValues[_encoderIndex];
-      if (firstReading) { _zeroTick = tick; firstReading = false; }
-      _targetAngle = (tick - _zeroTick) / _ticksPerDeg;
+  void _setCalib(int deg) {
+    final t = _smoothedTick;
+    setState(() {
+      if (deg == 0)  _tick0  = t;
+      if (deg == 45) _tick45 = t;
+      if (deg == 90) _tick90 = t;
     });
   }
 
@@ -216,16 +274,21 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
               borderRadius: BorderRadius.circular(24),
               child: Character3DViewer(
                 controller: _viewer,
-                movementType: exercise.movementType,
+                movementType: 'knee_extension',
                 startAngleDeg: exercise.startAngle,
                 endAngleDeg: exercise.endAngle,
                 modelPath: 'assets/models/Shannon_opt.glb',
                 modelScale: 0.01,
+                modelRotationY: 3.14159,
                 debugBones: false,
-                cameraPositionY: 0.5,
-                cameraPositionZ: 1.6,
+                cameraPositionX: 0.0,
+                cameraPositionY: 1.0,
+                cameraPositionZ: 1.7,
                 cameraTargetY: 0.9,
                 fov: 65,
+                ghostColor: accent.toARGB32() & 0xFFFFFF,
+                ghostAngleDeg: 90,
+                ghostSign: 1.0,
               ),
             ),
           ),
@@ -246,26 +309,65 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
                 const SizedBox(width: 12),
                 Text(
                   '${_currentAngle.toStringAsFixed(1)}°',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.text,
-                  ),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text),
                 ),
                 const Spacer(),
-                TextButton(
-                  onPressed: _setZero,
-                  child: const Text('Set Zero'),
-                ),
+                _CalibBtn(label: '0°',  set: _tick0  != null, onTap: () => _setCalib(0)),
+                _CalibBtn(label: '45°', set: _tick45 != null, onTap: () => _setCalib(45)),
+                _CalibBtn(label: '90°', set: _tick90 != null, onTap: () => _setCalib(90)),
               ],
             ],
           ),
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(top: 6),
+              child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
+            ),
+          if (_wsConnected && !_isCalibrated)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
               child: Text(
-                _error!,
-                style: const TextStyle(color: Colors.red, fontSize: 12),
+                'Chưa calibrate — bấm 0°, 45°, 90° để đo chính xác',
+                style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
+              ),
+            ),
+          if (_wsConnected)
+            GestureDetector(
+              onTap: () => setState(() => _showDebug = !_showDebug),
+              child: Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _showDebug ? '▲ Ẩn debug' : '▼ Xem debug',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                ),
+              ),
+            ),
+          if (_showDebug && _wsConnected)
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A1A2E),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: DefaultTextStyle(
+                style: const TextStyle(fontFamily: 'monospace', fontSize: 12, color: Color(0xFF00FF99)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('pkt      : $_packetCount'),
+                    Text('raw tick : $_rawTick'),
+                    Text('smoothed : ${_smoothedTick.toStringAsFixed(1)}'),
+                    const Divider(color: Color(0xFF00FF99), height: 10),
+                    Text('tick  0° : ${_tick0?.toStringAsFixed(1) ?? "—"}'),
+                    Text('tick 45° : ${_tick45?.toStringAsFixed(1) ?? "—"}'),
+                    Text('tick 90° : ${_tick90?.toStringAsFixed(1) ?? "—"}'),
+                    const Divider(color: Color(0xFF00FF99), height: 10),
+                    Text('target ° : ${_targetAngle.toStringAsFixed(1)}'),
+                    Text('current °: ${_currentAngle.toStringAsFixed(1)}'),
+                    Text('calib    : $_isCalibrated'),
+                  ],
+                ),
               ),
             ),
           const SizedBox(height: 22),
@@ -335,6 +437,37 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
             points: exercise.coachingPoints,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CalibBtn extends StatelessWidget {
+  const _CalibBtn({required this.label, required this.set, required this.onTap});
+  final String label;
+  final bool set;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: set ? Colors.green.shade100 : Colors.grey.shade200,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: set ? Colors.green : Colors.grey.shade400),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: set ? Colors.green.shade800 : Colors.grey.shade700,
+          ),
+        ),
       ),
     );
   }
@@ -481,6 +614,8 @@ class _ElbowExerciseShowcaseState extends State<_ElbowExerciseShowcase> {
                 cameraPositionY: 1.3,
                 cameraPositionZ: 2.8,
                 cameraTargetY: 1.1,
+                ghostColor: accent.toARGB32() & 0xFFFFFF,
+                ghostAngleDeg: 90,
               ),
             ),
           ),

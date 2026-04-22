@@ -59,10 +59,17 @@ class Character3DViewer extends StatefulWidget {
     this.useBakedPose = false,
     this.modelScaleTarget = 1.8,
     this.modelScale,
+    this.modelRotationY = 0.0,
+    this.cameraPositionX = 0.0,
     this.cameraPositionY = 1.35,
     this.cameraPositionZ = 2.8,
     this.cameraTargetY = 1.15,
     this.fov = 38,
+    this.ghostColor = 0x22CC66,
+    this.ghostAngleDeg,
+    this.ghostOffsetX = 0.0,
+    this.ghostOffsetZ = 0.0,
+    this.ghostSign,
   });
 
   final String movementType;
@@ -76,10 +83,22 @@ class Character3DViewer extends StatefulWidget {
   final double modelScaleTarget;
   /// Override: set a fixed scale directly, bypassing auto-scale. Null = use auto-scale.
   final double? modelScale;
+  final double modelRotationY;
+  final double cameraPositionX;
   final double cameraPositionY;
   final double cameraPositionZ;
   final double cameraTargetY;
   final double fov;
+  /// Hex color (e.g. 0x22CC66) for the ghost/target arm indicator.
+  final int ghostColor;
+  /// Override the ghost arm angle (degrees). Null = use endAngleDeg.
+  final double? ghostAngleDeg;
+  /// X-axis offset in world units for the ghost arm position (negative = left).
+  final double ghostOffsetX;
+  /// Z-axis offset in world units for the ghost arm position.
+  final double ghostOffsetZ;
+  /// Override the sign used for ghost angle calculation. Null = use movement sign.
+  final double? ghostSign;
 
   @override
   State<Character3DViewer> createState() => _Character3DViewerState();
@@ -177,8 +196,16 @@ class _Character3DViewerState extends State<Character3DViewer> {
     final startRad = widget.startAngleDeg * 3.14159265 / 180 * sign;
     final endRad = widget.endAngleDeg * 3.14159265 / 180 * sign;
     final debug = widget.debugBones ? 'true' : 'false';
+    final ghostColor = '0x${widget.ghostColor.toRadixString(16).padLeft(6, '0')}';
+    final ghostAngle = widget.ghostAngleDeg ?? widget.endAngleDeg;
+    final effectiveGhostSign = widget.ghostSign ?? sign;
+    final ghostRad = ghostAngle * 3.14159265 / 180 * effectiveGhostSign;
+    final ghostOffsetX = widget.ghostOffsetX;
+    final ghostOffsetZ = widget.ghostOffsetZ;
     final scaleTarget = widget.modelScaleTarget;
     final fixedScale = widget.modelScale != null ? widget.modelScale.toString() : 'null';
+    final modelRotY = widget.modelRotationY;
+    final camX = widget.cameraPositionX;
     final camY = widget.cameraPositionY;
     final camZ = widget.cameraPositionZ;
     final tgtY = widget.cameraTargetY;
@@ -205,7 +232,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
 
   var w = window.innerWidth, h = window.innerHeight;
   var camera = new THREE.PerspectiveCamera($fov, w / h, 0.01, 200);
-  camera.position.set(0, $camY, $camZ);
+  camera.position.set($camX, $camY, $camZ);
 
   var renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -234,6 +261,10 @@ class _Character3DViewerState extends State<Character3DViewer> {
   var SIGN            = $sign;
   var START           = $startRad;
   var END             = $endRad;
+  var GHOST_COLOR     = $ghostColor;
+  var GHOST_END       = $ghostRad;
+  var GHOST_OFFSET_X  = $ghostOffsetX;
+  var GHOST_OFFSET_Z  = $ghostOffsetZ;
   var DURATION        = 2800;
   var ARM_DOWN        = -1.5708;
   var IS_KNEE         = SUFFIX.indexOf('leg') !== -1;
@@ -250,6 +281,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
   var boneMap     = Object.create(null);
   var startTime   = null;
   var boneBaseRot = {};
+  var ghostMesh   = null;
 
   // Called from Flutter: sets the animated bone to [deg] degrees from rest pose
   window.setAngle = function(deg) {
@@ -339,6 +371,7 @@ class _Character3DViewerState extends State<Character3DViewer> {
     var fixedScale = $fixedScale;
     var finalScale = fixedScale !== null ? fixedScale : (height > 0 ? $scaleTarget / height : 1);
     model.scale.setScalar(finalScale);
+    model.rotation.y = $modelRotY;
 
     scene.add(model);
 
@@ -368,6 +401,25 @@ class _Character3DViewerState extends State<Character3DViewer> {
       boneBaseRot[i] = targetBones[i].rotation[AXIS];
     }
 
+    // Ghost arm: world-space mesh, updated every frame
+    if (targetBones.length > 0 && GHOST_END !== 0) {
+      var ghostMat = new THREE.MeshBasicMaterial({
+        color: GHOST_COLOR, transparent: true, opacity: 0.55,
+        depthWrite: false, depthTest: false
+      });
+
+      // World-size geometry: 28 cm cylinder, pivot at base
+      var cylGeom = new THREE.CylinderGeometry(0.018, 0.026, 0.28, 12);
+      cylGeom.translate(0, 0.14, 0);
+      var ballGeom = new THREE.SphereGeometry(0.022, 10, 10);
+      ballGeom.translate(0, 0.28, 0);
+
+      ghostMesh = new THREE.Group();
+      ghostMesh.add(new THREE.Mesh(cylGeom,  ghostMat));
+      ghostMesh.add(new THREE.Mesh(ballGeom, ghostMat));
+      scene.add(ghostMesh);
+    }
+
     if (DEBUG) console.log('Target bones found:', targetBones.length);
   }, undefined, function(err) {
     console.error('GLTFLoader error:', err);
@@ -385,6 +437,29 @@ class _Character3DViewerState extends State<Character3DViewer> {
       for (var i = 0; i < targetBones.length; i++) {
         targetBones[i].rotation[AXIS] = angle;
       }
+    }
+
+    // Update ghost arm in world space each frame
+    if (ghostMesh && targetBones.length > 0) {
+      var bone = targetBones[0];
+
+      // Temporarily set bone to ghost angle, sample world transform, then restore
+      var savedAngle = bone.rotation[AXIS];
+      bone.rotation[AXIS] = (boneBaseRot[0] || 0) + GHOST_END;
+      bone.updateWorldMatrix(true, true);
+
+      var elbowPos = new THREE.Vector3();
+      bone.getWorldPosition(elbowPos);
+      elbowPos.x += GHOST_OFFSET_X;
+      elbowPos.z += GHOST_OFFSET_Z;
+      ghostMesh.position.copy(elbowPos);
+
+      var ghostQuat = new THREE.Quaternion();
+      bone.getWorldQuaternion(ghostQuat);
+      ghostMesh.quaternion.copy(ghostQuat);
+
+      bone.rotation[AXIS] = savedAngle;
+      bone.updateWorldMatrix(true, true);
     }
 
     controls.update();
