@@ -427,6 +427,8 @@ class _Character3DViewerState extends State<Character3DViewer> {
 
     // Build bone map + collect target bones
     model.traverse(function(obj) {
+      // Disable frustum culling: bounding sphere is stale after bone animation
+      if (obj.isMesh) obj.frustumCulled = false;
       if (!obj.isBone) return;
       var n = obj.name.toLowerCase();
       boneMap[n] = obj;

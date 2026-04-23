@@ -252,15 +252,6 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
     }
   }
 
-  void _setCalib(int deg) {
-    final t = _smoothedTick;
-    setState(() {
-      if (deg == 0)  _tick0  = t;
-      if (deg == 45) _tick45 = t;
-      if (deg == 90) _tick90 = t;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final exercise = widget.exercise;
@@ -345,10 +336,6 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
                   '${_currentAngle.toStringAsFixed(1)}°',
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.text),
                 ),
-                const Spacer(),
-                _CalibBtn(label: '0°',  set: _tick0  != null, onTap: () => _setCalib(0)),
-                _CalibBtn(label: '45°', set: _tick45 != null, onTap: () => _setCalib(45)),
-                _CalibBtn(label: '90°', set: _tick90 != null, onTap: () => _setCalib(90)),
               ],
             ],
           ),
@@ -356,14 +343,6 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text(_error!, style: const TextStyle(color: Colors.red, fontSize: 12)),
-            ),
-          if (_wsConnected && !_isCalibrated)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                'Chưa calibrate — bấm 0°, 45°, 90° để đo chính xác',
-                style: TextStyle(fontSize: 12, color: Colors.orange.shade700),
-              ),
             ),
           if (_wsConnected)
             GestureDetector(
@@ -393,13 +372,8 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
                     Text('raw tick : $_rawTick'),
                     Text('smoothed : ${_smoothedTick.toStringAsFixed(1)}'),
                     const Divider(color: Color(0xFF00FF99), height: 10),
-                    Text('tick  0° : ${_tick0?.toStringAsFixed(1) ?? "—"}'),
-                    Text('tick 45° : ${_tick45?.toStringAsFixed(1) ?? "—"}'),
-                    Text('tick 90° : ${_tick90?.toStringAsFixed(1) ?? "—"}'),
-                    const Divider(color: Color(0xFF00FF99), height: 10),
                     Text('target ° : ${_targetAngle.toStringAsFixed(1)}'),
                     Text('current °: ${_currentAngle.toStringAsFixed(1)}'),
-                    Text('calib    : $_isCalibrated'),
                   ],
                 ),
               ),
@@ -471,37 +445,6 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
             points: exercise.coachingPoints,
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _CalibBtn extends StatelessWidget {
-  const _CalibBtn({required this.label, required this.set, required this.onTap});
-  final String label;
-  final bool set;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(left: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: set ? Colors.green.shade100 : Colors.grey.shade200,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: set ? Colors.green : Colors.grey.shade400),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: set ? Colors.green.shade800 : Colors.grey.shade700,
-          ),
-        ),
       ),
     );
   }
