@@ -115,15 +115,10 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
   // Median filter buffer (5 samples)
   final List<double> _medBuf = [];
 
-  // 3-point calibration ticks
-  double? _tick0;   // leg normal (0°)
-  double? _tick45;  // leg mid (45°)
-  double? _tick90;  // leg straight (90°)
-
   static const int    _encoderIndex  = 1;
   static const double _lerpSpeed     = 0.18;
   static const double _emaAlpha      = 0.20;
-  static const double _fallbackMax   = 2000.0; // tick value that maps to 90°
+  static const double _fallbackMax   = 2000.0;
 
   static const double _ghostMin   = 15.0;
   static const double _ghostMax   = 85.0;
@@ -145,30 +140,6 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
     _ghostAbove = _ghostAngle > _currentAngle;
     _viewer.setGhostAngle(_ghostAngle);
   }
-
-  bool get _isCalibrated => _tick0 != null && _tick45 != null && _tick90 != null;
-
-  double _tickToAngle(double tick) {
-    if (!_isCalibrated) return 0;
-    final t0 = _tick0!, t45 = _tick45!, t90 = _tick90!;
-    if ((t90 - t0).abs() < 1) return 0;
-    // piecewise linear: t0→t45 = 0°→45°, t45→t90 = 45°→90°
-    if ((t45 - t0).abs() > 1 && _between(tick, t0, t45)) {
-      return 45.0 * (tick - t0) / (t45 - t0);
-    }
-    if ((t90 - t45).abs() > 1 && _between(tick, t45, t90)) {
-      return 45.0 + 45.0 * (tick - t45) / (t90 - t45);
-    }
-    // outside range: clamp
-    if ((t90 - t0) > 0) {
-      return (tick <= t0) ? 0.0 : 90.0;
-    } else {
-      return (tick >= t0) ? 0.0 : 90.0;
-    }
-  }
-
-  bool _between(double v, double a, double b) =>
-      (a <= b) ? (v >= a && v <= b) : (v <= a && v >= b);
 
   @override
   void dispose() {
@@ -237,13 +208,7 @@ class _KneeExerciseShowcaseState extends State<_KneeExerciseShowcase> {
         // Single-stage EMA low-pass (faster response)
         _ema1 = _ema1 * (1 - _emaAlpha) + median * _emaAlpha;
         _smoothedTick = _ema1;
-        if (_isCalibrated) {
-          _targetAngle = _tickToAngle(_smoothedTick);
-        } else {
-          // Fallback: use tick0 if pressed, else baseTick as the rest reference.
-          // Extension = tick increasing above ref.
-          _targetAngle = (_smoothedTick / _fallbackMax * 90.0).clamp(0.0, 90.0);
-        }
+        _targetAngle = (_smoothedTick / _fallbackMax * 90.0).clamp(0.0, 90.0);
       });
       _startSmoothTimer();
       setState(() { _wsConnected = true; _connecting = false; });
